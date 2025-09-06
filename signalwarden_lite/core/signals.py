@@ -1,227 +1,153 @@
+# signalwarden_lite/core/signals.py
 from dataclasses import dataclass
-import pandas as pd
-import numpy as np
+import numpy as np, pandas as pd
 
 @dataclass
 class SignalParams:
-    # динамические lookback по режимам
-    lookback_calm: int = 26
-    lookback_normal: int = 18
-    lookback_high: int = 10
+    lookback_calm:int=24; lookback_normal:int=16; lookback_high:int=10
+    ltf_thinbar_k:float=0.25
+    # ATR cushions (ассиметричные)
+    long_cushion_calm:float=0.30; long_cushion_normal:float=0.12; long_cushion_high:float=0.08
+    short_cushion_calm:float=0.32; short_cushion_normal:float=0.14; short_cushion_high:float=0.10
+    # включатели
+    setup_breakout:bool=True
+    setup_inside:bool=True
+    setup_trend_cont:bool=True
+    setup_squeeze:bool=True
+    # inside-bar
+    ib_min_prev_range_k_atr:float=0.5
+    # trend-continuation
+    tc_min_body_k_range:float=0.50
+    tc_confirm_close_k_body:float=0.20
+    # squeeze
+    bb_period:int=20; bb_k:float=2.0; width_k_perc:float=9.0
+    # short guard
+    sg_min_natr_perc:float=1.2
+    sg_need_close_below_ema20:bool=True
+    sg_slope_lookback:int=3
 
-    atr_cushion_calm: float = 0.30
-    atr_cushion_normal: float = 0.12
-    atr_cushion_high: float = 0.08
+def _cushion(regime:str, side:str, p:SignalParams)->float:
+    if side=='long':
+        return p.long_cushion_high if regime=='high' else (p.long_cushion_normal if regime=='normal' else p.long_cushion_calm)
+    else:
+        return p.short_cushion_high if regime=='high' else (p.short_cushion_normal if regime=='normal' else p.short_cushion_calm)
 
-    ltf_thinbar_k: float = 0.25
+def _roll_max(s,n): return s.shift(1).rolling(n).max()
+def _roll_min(s,n): return s.shift(1).rolling(n).min()
 
-    # сетапы
-    setup_breakout: bool = True
-    setup_micro_breakout: bool = True
-    setup_trend_cont: bool = True
-    setup_squeeze: bool = True
-    
-    # параметры micro-breakout
-    micro_lb_normal: int = 10
-    micro_lb_high: int = 6
-    micro_cushion_normal: float = 0.08
-    micro_cushion_high: float = 0.05
-    
-    # параметры trend-continuation
-    tc_min_body_k_range: float = 0.65
-    tc_confirm_close_k_body: float = 0.30
-    
-    # параметры squeeze-breakout
-    bb_period: int = 20
-    bb_k: float = 2.0
-    width_k_perc: float = 6.0
-
-def _atr_cushion(regime: str, p: SignalParams) -> float:
-    """Get ATR cushion based on regime"""
-    if regime == 'high':
-        return p.atr_cushion_high
-    elif regime == 'normal':
-        return p.atr_cushion_normal
-    else:  # calm or ultra_calm
-        return p.atr_cushion_calm
-
-def _bollinger_bands(close: pd.Series, period: int, k: float):
-    """Calculate Bollinger Bands"""
-    sma = close.rolling(period).mean()
-    std = close.rolling(period).std()
-    upper = sma + k * std
-    lower = sma - k * std
-    return upper, sma, lower
-
-def generate_signals(df: pd.DataFrame, p: SignalParams, market_gate: pd.DataFrame = None) -> pd.DataFrame:
-    """Generate trading signals based on four setups"""
+def generate_signals(df: pd.DataFrame, p: SignalParams, market_gate: pd.DataFrame=None,
+                     directions_cfg: dict=None) -> pd.DataFrame:
     out = df.copy()
-
-    # тренд (EMA 50/200 уже добавлены в features.add_indicators)
-    out['trend_long'] = out['ema_fast'] > out['ema_slow']
+    out['trend_long']  = out['ema_fast'] > out['ema_slow']
     out['trend_short'] = out['ema_fast'] < out['ema_slow']
+    out['ema20'] = out['close'].ewm(span=20, adjust=False).mean()
 
-    # динамические swing-уровни
-    lb_high_h = out['high'].shift(1).rolling(p.lookback_high, min_periods=1).max()
-    lb_high_l = out['low'].shift(1).rolling(p.lookback_high, min_periods=1).min()
-    lb_norm_h = out['high'].shift(1).rolling(p.lookback_normal, min_periods=1).max()
-    lb_norm_l = out['low'].shift(1).rolling(p.lookback_normal, min_periods=1).min()
-    lb_calm_h = out['high'].shift(1).rolling(p.lookback_calm, min_periods=1).max()
-    lb_calm_l = out['low'].shift(1).rolling(p.lookback_calm, min_periods=1).min()
+    # BTC-гейты
+    if market_gate is not None and {'mkt_long_ok','mkt_short_ok'}.issubset(market_gate.columns):
+        out = out.merge(market_gate[['timestamp','mkt_long_ok','mkt_short_ok']], on='timestamp', how='left')
+        out[['mkt_long_ok','mkt_short_ok']] = out[['mkt_long_ok','mkt_short_ok']].ffill().fillna(False)
+    else:
+        out['mkt_long_ok']=True; out['mkt_short_ok']=True
 
-    swing_high = lb_calm_h.where(out['regime'].isin(['ultra_calm','calm']), lb_norm_h)
-    swing_high = swing_high.where(out['regime']!='high', lb_high_h)
-    swing_low = lb_calm_l.where(out['regime'].isin(['ultra_calm','calm']), lb_norm_l)
-    swing_low = swing_low.where(out['regime']!='high', lb_high_l)
+    # динамические свинги
+    lbH = _roll_max(out['high'], p.lookback_high);  lbL = _roll_min(out['low'],  p.lookback_high)
+    lnH = _roll_max(out['high'], p.lookback_normal);lnL = _roll_min(out['low'],  p.lookback_normal)
+    lcH = _roll_max(out['high'], p.lookback_calm);  lcL = _roll_min(out['low'],  p.lookback_calm)
+    swingH = lcH.where(out['regime'].isin(['ultra_calm','calm']), lnH).where(out['regime']!='high', lbH)
+    swingL = lcL.where(out['regime'].isin(['ultra_calm','calm']), lnL).where(out['regime']!='high', lbL)
+    out['swing_high'], out['swing_low'] = swingH, swingL
 
-    out['swing_high'] = swing_high
-    out['swing_low'] = swing_low
-
-    # ATR-подушка
-    atr_cush = out['regime'].apply(lambda r: _atr_cushion(r, p))
-    
-    # фильтр «тонкой» свечи
-    hourly_range = (out['high'] - out['low']).abs()
+    # тонкая свеча
     thin_cutoff = p.ltf_thinbar_k * out['atr']
-    out['thin_bar'] = hourly_range < thin_cutoff
+    out['thin_bar'] = (out['high'] - out['low']).abs() < thin_cutoff
 
-    # --- A) Breakout (основной) ---
-    out['long_entry_breakout'] = swing_high + atr_cush * out['atr']
-    out['short_entry_breakout'] = swing_low - atr_cush * out['atr']
-    
-    if p.setup_breakout:
-        out['sig_long_breakout'] = (
-            out['trend_long'] & 
-            (out['regime'] != 'ultra_calm') & 
-            (out['high'] >= out['long_entry_breakout']) & 
-            (~out['thin_bar'])
-        )
-        out['sig_short_breakout'] = (
-            out['trend_short'] & 
-            (out['regime'] != 'ultra_calm') & 
-            (out['low'] <= out['short_entry_breakout']) & 
-            (~out['thin_bar'])
-        )
+    # ATR подушки
+    long_cush  = out['regime'].apply(lambda r: _cushion(r,'long',p))
+    short_cush = out['regime'].apply(lambda r: _cushion(r,'short',p))
+
+    # A) Breakout
+    out['long_entry_breakout']  = out['swing_high'] + long_cush*out['atr']
+    out['short_entry_breakout'] = out['swing_low']  - short_cush*out['atr']
+    out['sig_long_breakout']  = p.setup_breakout  and out['trend_long']  & (~out['thin_bar']) & (out['high']>=out['long_entry_breakout'])
+    out['sig_short_breakout'] = p.setup_breakout  and out['trend_short'] & (~out['thin_bar']) & (out['low'] <=out['short_entry_breakout'])
+
+    # B) Inside-bar (по тренду)
+    if p.setup_inside:
+        prevH, prevL = out['high'].shift(1), out['low'].shift(1)
+        prevR = (prevH - prevL).abs()
+        ib = (out['high'] <= prevH) & (out['low'] >= prevL)
+        big = prevR >= (p.ib_min_prev_range_k_atr * out['atr'])
+        out['long_entry_inside']  = prevH + long_cush*out['atr']
+        out['short_entry_inside'] = prevL - short_cush*out['atr']
+        out['sig_long_inside']  = ib & big & out['trend_long']  & (~out['thin_bar'])
+        out['sig_short_inside'] = ib & big & out['trend_short'] & (~out['thin_bar'])
     else:
-        out['sig_long_breakout'] = False
-        out['sig_short_breakout'] = False
+        out['sig_long_inside']=False; out['sig_short_inside']=False
 
-    # --- B) Micro-breakout (короткие lookback) ---
-    micro_lb_h = out['high'].shift(1).rolling(p.micro_lb_normal, min_periods=1).max()
-    micro_lb_l = out['low'].shift(1).rolling(p.micro_lb_normal, min_periods=1).min()
-    micro_lb_h = micro_lb_h.where(out['regime']!='high', 
-                                  out['high'].shift(1).rolling(p.micro_lb_high, min_periods=1).max())
-    micro_lb_l = micro_lb_l.where(out['regime']!='high', 
-                                  out['low'].shift(1).rolling(p.micro_lb_high, min_periods=1).min())
-    
-    micro_cushion = out['regime'].apply(lambda r: p.micro_cushion_high if r == 'high' else p.micro_cushion_normal)
-    out['long_entry_micro'] = micro_lb_h + micro_cushion * out['atr']
-    out['short_entry_micro'] = micro_lb_l - micro_cushion * out['atr']
-    
-    if p.setup_micro_breakout:
-        out['sig_long_micro'] = (
-            out['trend_long'] & 
-            (out['regime'] != 'ultra_calm') & 
-            (out['high'] >= out['long_entry_micro']) & 
-            (~out['thin_bar'])
-        )
-        out['sig_short_micro'] = (
-            out['trend_short'] & 
-            (out['regime'] != 'ultra_calm') & 
-            (out['low'] <= out['short_entry_micro']) & 
-            (~out['thin_bar'])
-        )
-    else:
-        out['sig_long_micro'] = False
-        out['sig_short_micro'] = False
-
-    # --- C) Trend-continuation ---
-    body_size = abs(out['close'] - out['open'])
-    bar_range = out['high'] - out['low']
-    body_ratio = body_size / bar_range.replace(0, np.nan)
-    
-    # Сильное тело свечи
-    strong_body = body_ratio >= p.tc_min_body_k_range
-    # Закрытие в направлении тренда
-    trend_close_long = (out['close'] > out['open']) & (out['close'] >= out['open'] + p.tc_confirm_close_k_body * body_size)
-    trend_close_short = (out['close'] < out['open']) & (out['close'] <= out['open'] - p.tc_confirm_close_k_body * body_size)
-    
-    out['long_entry_trend'] = out['high'] + atr_cush * out['atr']
-    out['short_entry_trend'] = out['low'] - atr_cush * out['atr']
-    
+    # C) Trend-Continuation (ослаблено)
     if p.setup_trend_cont:
-        out['sig_long_trend'] = (
-            out['trend_long'] & 
-            strong_body & 
-            trend_close_long & 
-            (out['regime'] != 'ultra_calm') & 
-            (~out['thin_bar'])
-        )
-        out['sig_short_trend'] = (
-            out['trend_short'] & 
-            strong_body & 
-            trend_close_short & 
-            (out['regime'] != 'ultra_calm') & 
-            (~out['thin_bar'])
-        )
+        po, pc = out['open'].shift(1), out['close'].shift(1)
+        ph, pl = out['high'].shift(1), out['low'].shift(1)
+        body = (pc-po).abs(); rng=(ph-pl).abs()
+        strong = body >= p.tc_min_body_k_range * rng
+        long_conf  = out['close'] >= (pc - p.tc_confirm_close_k_body * body)
+        short_conf = out['close'] <= (pc + p.tc_confirm_close_k_body * body)
+        out['long_entry_tc']  = ph + long_cush*out['atr']
+        out['short_entry_tc'] = pl - short_cush*out['atr']
+        out['sig_long_tc']  = strong & out['trend_long']  & long_conf  & (~out['thin_bar'])
+        out['sig_short_tc'] = strong & out['trend_short'] & short_conf & (~out['thin_bar'])
     else:
-        out['sig_long_trend'] = False
-        out['sig_short_trend'] = False
+        out['sig_long_tc']=False; out['sig_short_tc']=False
 
-    # --- D) Squeeze-breakout (Bollinger Bands сжатие) ---
-    bb_upper, bb_middle, bb_lower = _bollinger_bands(out['close'], p.bb_period, p.bb_k)
-    bb_width = (bb_upper - bb_lower) / bb_middle * 100
-    bb_squeeze = bb_width <= p.width_k_perc
-    
-    out['long_entry_squeeze'] = bb_upper + atr_cush * out['atr']
-    out['short_entry_squeeze'] = bb_lower - atr_cush * out['atr']
-    
+    # D) Squeeze-Breakout (слегка шире)
     if p.setup_squeeze:
-        out['sig_long_squeeze'] = (
-            out['trend_long'] & 
-            bb_squeeze & 
-            (out['high'] >= out['long_entry_squeeze']) & 
-            (out['regime'] != 'ultra_calm') & 
-            (~out['thin_bar'])
-        )
-        out['sig_short_squeeze'] = (
-            out['trend_short'] & 
-            bb_squeeze & 
-            (out['low'] <= out['short_entry_squeeze']) & 
-            (out['regime'] != 'ultra_calm') & 
-            (~out['thin_bar'])
-        )
+        ma = out['close'].rolling(p.bb_period).mean()
+        sd = out['close'].rolling(p.bb_period).std()
+        upper, lower = ma + p.bb_k*sd, ma - p.bb_k*sd
+        width_perc = (upper - lower) / ma * 100.0
+        sq = width_perc <= p.width_k_perc
+        out['long_entry_sq']  = out['swing_high'] + long_cush*out['atr']
+        out['short_entry_sq'] = out['swing_low']  - short_cush*out['atr']
+        out['sig_long_sq']  = sq & out['trend_long']  & (~out['thin_bar'])
+        out['sig_short_sq'] = sq & out['trend_short'] & (~out['thin_bar'])
     else:
-        out['sig_long_squeeze'] = False
-        out['sig_short_squeeze'] = False
+        out['sig_long_sq']=False; out['sig_short_sq']=False
 
-    # итог: разрешённые сигналы = ИЛИ всех сетапов
-    out['allow_long'] = out[['sig_long_breakout', 'sig_long_micro', 'sig_long_trend', 'sig_long_squeeze']].any(axis=1)
-    out['allow_short'] = out[['sig_short_breakout', 'sig_short_micro', 'sig_short_trend', 'sig_short_squeeze']].any(axis=1)
+    # объединяем сигналы
+    Lcols = ['sig_long_breakout','sig_long_inside','sig_long_tc','sig_long_sq']
+    Scols = ['sig_short_breakout','sig_short_inside','sig_short_tc','sig_short_sq']
+    out['allow_long_raw']  = out[Lcols].any(axis=1)
+    out['allow_short_raw'] = out[Scols].any(axis=1)
 
-    # выбираем цену входа и причину (приоритет: breakout > micro > trend > squeeze)
-    def _choose_long(r):
-        if r['sig_long_breakout']: return r['long_entry_breakout'], 'breakout'
-        if r['sig_long_micro']: return r['long_entry_micro'], 'micro_breakout'
-        if r['sig_long_trend']: return r['long_entry_trend'], 'trend_continuation'
-        if r['sig_long_squeeze']: return r['long_entry_squeeze'], 'squeeze_breakout'
+    # BTC-гейт и Short-Guard
+    # long final
+    out['allow_long'] = out['allow_long_raw'] & out['mkt_long_ok']
+    # short guard
+    slope = out['ema_slow'] - out['ema_slow'].shift(p.sg_slope_lookback)
+    natr_perc = out['natr']  # предполагаем, что add_indicators добавил natr (%)
+    guard_short = (out['ema_fast'] < out['ema_slow']) & (slope < 0) \
+                  & (natr_perc >= p.sg_min_natr_perc) \
+                  & (out['close'] < out['ema20'] if p.sg_need_close_below_ema20 else True)
+    out['allow_short'] = out['allow_short_raw'] & out['mkt_short_ok'] & guard_short
+
+    # пер-символьные маски направлений (если переданы)
+    if directions_cfg:
+        def dir_mask(ts_row):
+            return True
+        # применим постфактум по символам в run_backtest/live
+
+    # выбор цены и причины (приоритет: breakout > inside > tc > squeeze)
+    def _pick_long(r):
+        for k, lab in [('sig_long_breakout','breakout'),('sig_long_inside','inside'),('sig_long_tc','trend_cont'),('sig_long_sq','squeeze')]:
+            if r[k]: return r.get(f'long_entry_{lab if lab!="breakout" else "breakout"}', np.nan), lab
+        return np.nan, ''
+    def _pick_short(r):
+        for k, lab in [('sig_short_breakout','breakout'),('sig_short_inside','inside'),('sig_short_tc','trend_cont'),('sig_short_sq','squeeze')]:
+            if r[k]: return r.get(f'short_entry_{lab if lab!="breakout" else "breakout"}', np.nan), lab
         return np.nan, ''
 
-    def _choose_short(r):
-        if r['sig_short_breakout']: return r['short_entry_breakout'], 'breakout'
-        if r['sig_short_micro']: return r['short_entry_micro'], 'micro_breakout'
-        if r['sig_short_trend']: return r['short_entry_trend'], 'trend_continuation'
-        if r['sig_short_squeeze']: return r['short_entry_squeeze'], 'squeeze_breakout'
-        return np.nan, ''
-
-    chosen_long = out.apply(_choose_long, axis=1, result_type='expand')
-    chosen_short = out.apply(_choose_short, axis=1, result_type='expand')
-    out['long_entry_final'], out['long_reason'] = chosen_long[0], chosen_long[1]
-    out['short_entry_final'], out['short_reason'] = chosen_short[0], chosen_short[1]
-    
-    # Применяем рыночный фильтр если есть
-    if market_gate is not None and not market_gate.empty:
-        from .market import apply_market_filter
-        out = apply_market_filter(out, market_gate)
-    
+    cL = out.apply(_pick_long, axis=1, result_type='expand')
+    cS = out.apply(_pick_short, axis=1, result_type='expand')
+    out['long_entry_final'], out['long_reason'] = cL[0], cL[1]
+    out['short_entry_final'], out['short_reason'] = cS[0], cS[1]
     return out
