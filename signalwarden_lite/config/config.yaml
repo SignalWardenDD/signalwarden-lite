@@ -1,10 +1,8 @@
-profile: v1_5_TX_profit_first
+profile: v1_6_TXB_profit_first
 
 symbols: [ADA_USDT, LTC_USDT, DOGE_USDT, ENA_USDT, HBAR_USDT, WIF_USDT, PNUT_USDT]
 
-timeframes:
-  primary: 1h
-  ltf: 15m        # для inside/trend/squeeze
+timeframes: {primary: 1h, ltf: 15m}
 
 risk:
   mode: fixed_margin
@@ -28,14 +26,14 @@ signals:
   setup_timeframes: {breakout: 1h, inside_bar: 15m, trend_continuation: 15m, squeeze_breakout: 15m}
   dynamic_lookback: {calm: 24, normal: 16, high: 10}
   atr_cushion_long:  {calm: 0.30, normal: 0.12, high: 0.08}
-  atr_cushion_short: {calm: 0.34, normal: 0.16, high: 0.12}   # short = шире
+  atr_cushion_short: {calm: 0.34, normal: 0.16, high: 0.12}
   ltf_thinbar_k: 0.25
   setups:
     breakout:           {enabled: true}
     inside_bar:         {enabled: true, min_prev_range_k_atr: 0.30}
     trend_continuation: {enabled: true, min_body_k_range: 0.45, confirm_close_k_body: 0.18}
     squeeze_breakout:   {enabled: true, bb_period: 20, bb_k: 2.0, width_k_perc: 12.0}
-    micro_breakout:     {enabled: false}  # оставляем выключенным (убыточен)
+    micro_breakout:     {enabled: false}
 
 market_filter:
   symbol: BTC_USDT
@@ -43,23 +41,29 @@ market_filter:
   ema_slow: 200
 
 short_guard:
-  min_natr_perc: 1.0
-  rsi_period: 14
-  rsi_short_max: 48
-  need_close_below_ema20: false
+  # Адаптивные пороги для шортов
+  rsi_bear_max: 52      # когда mkt_short_ok = True (медвежья фаза BTC)
+  rsi_bullcorr_max: 50  # когда mkt_short_ok = False (коррекции в бычьем рынке)
+  min_natr_bear: 0.9
+  min_natr_bullcorr: 0.8
+  require_close_below_ema20_bullcorr: true
   slope_lookback: 3
+  rsi_period: 14
 
 directions:
   default: {allow_long: true, allow_short: true}
-  # без символ-оверрайдов: все пары и оба направления разрешены
 
 quality:
   max_positions_per_symbol: 1
-  # верхние пределы, чтобы не улететь в гиперактивность; 5–6/день дадут 7 пар × (1–2)/день
   max_trades_per_symbol_per_day_by_regime: {calm: 1, normal: 2, high: 2}
 
-fees: {maker_bps: 2, taker_bps: 5}
-slippage: {base_spread_mult: 1.0, stress_spread_mult: 2.0}
+fees:
+  maker_bps: 2
+  taker_bps: 5
+  entry_liquidity: maker_first    # taker | maker_first
+slippage:
+  bps_entry: 0
+  bps_exit: 0
 
 exchange:  {id: binanceusdm, testnet: true, rate_limit: true}
 execution: {maker_first: true, ttl_seconds: 8, fallback_market: true, manage_stop: true}

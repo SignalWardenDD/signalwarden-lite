@@ -8,6 +8,7 @@ from ..core.trailing import TrailingConfig, update_trailing_hybrid
 class FeesCfg:
     maker_bps: float = 2.0
     taker_bps: float = 5.0
+    entry_liquidity: str = 'taker'  # 'taker' | 'maker_first'
 
 def _qty(notional_usdt: float, price: float) -> float:
     """Calculate quantity based on notional value"""
@@ -106,7 +107,9 @@ def run_backtest_one(df: pd.DataFrame, symbol: str,
                 else:
                     reason = 'SL_INIT'  # Исходный стоп
                 
-                fee = _fees(pos.entry*pos.qty, fees.taker_bps) + _fees(price*pos.qty, fees.taker_bps)
+                # Entry fee: maker_first or taker, Exit fee: always taker (stop market)
+                entry_fee_bps = fees.maker_bps if fees.entry_liquidity == 'maker_first' else fees.taker_bps
+                fee = _fees(pos.entry*pos.qty, entry_fee_bps) + _fees(price*pos.qty, fees.taker_bps)
                 trades.append(TradeLog(
                     symbol=symbol,
                     open_ts=int(prev_row['timestamp']),
@@ -135,7 +138,9 @@ def run_backtest_one(df: pd.DataFrame, symbol: str,
                 else:
                     reason = 'SL_INIT'  # Исходный стоп
                 
-                fee = _fees(pos.entry*pos.qty, fees.taker_bps) + _fees(price*pos.qty, fees.taker_bps)
+                # Entry fee: maker_first or taker, Exit fee: always taker (stop market)
+                entry_fee_bps = fees.maker_bps if fees.entry_liquidity == 'maker_first' else fees.taker_bps
+                fee = _fees(pos.entry*pos.qty, entry_fee_bps) + _fees(price*pos.qty, fees.taker_bps)
                 trades.append(TradeLog(
                     symbol=symbol,
                     open_ts=int(prev_row['timestamp']),
