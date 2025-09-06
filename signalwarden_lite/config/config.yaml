@@ -1,15 +1,10 @@
-profile: v1_4_T_profit_first
+profile: v1_5_TX_profit_first
 
-symbols:
-  - ADA_USDT
-  - LTC_USDT
-  - DOGE_USDT
-  - ENA_USDT
-  - HBAR_USDT
-  - WIF_USDT
-# PNUT_USDT отключена
+symbols: [ADA_USDT, LTC_USDT, DOGE_USDT, ENA_USDT, HBAR_USDT, WIF_USDT, PNUT_USDT]
 
-timeframes: {primary: 1h, confirm: 15m}
+timeframes:
+  primary: 1h
+  ltf: 15m        # для inside/trend/squeeze
 
 risk:
   mode: fixed_margin
@@ -19,10 +14,10 @@ risk:
   cutloss_early: {enabled: false}
 
 trailing:
-  move_to_be_at_R: 0.40
+  move_to_be_at_R: 0.35
   be_offset_R: 0.08
   activate_R: 0.35
-  step_R: 0.25
+  step_R: 0.20
   chandelier_k_atr: 3.5
 
 regime:
@@ -30,38 +25,38 @@ regime:
   calm_thresholds: {ultra_calm: 0.8, calm: 1.2, high: 2.5}
 
 signals:
+  setup_timeframes: {breakout: 1h, inside_bar: 15m, trend_continuation: 15m, squeeze_breakout: 15m}
   dynamic_lookback: {calm: 24, normal: 16, high: 10}
-  atr_cushion_long:   {calm: 0.30, normal: 0.12, high: 0.08}
-  atr_cushion_short:  {calm: 0.32, normal: 0.14, high: 0.10}
+  atr_cushion_long:  {calm: 0.30, normal: 0.12, high: 0.08}
+  atr_cushion_short: {calm: 0.34, normal: 0.16, high: 0.12}   # short = шире
   ltf_thinbar_k: 0.25
   setups:
     breakout:           {enabled: true}
-    inside_bar:         {enabled: true, min_prev_range_k_atr: 0.5}
-    trend_continuation: {enabled: true, min_body_k_range: 0.50, confirm_close_k_body: 0.20}
-    squeeze_breakout:   {enabled: true, bb_period: 20, bb_k: 2.0, width_k_perc: 9.0}
-    micro_breakout:     {enabled: false}  # отключено
+    inside_bar:         {enabled: true, min_prev_range_k_atr: 0.30}
+    trend_continuation: {enabled: true, min_body_k_range: 0.45, confirm_close_k_body: 0.18}
+    squeeze_breakout:   {enabled: true, bb_period: 20, bb_k: 2.0, width_k_perc: 12.0}
+    micro_breakout:     {enabled: false}  # оставляем выключенным (убыточен)
 
 market_filter:
-  symbol: BTC_USDT          # обязательно иметь BTC_USDT_1h.pkl для бэктеста
+  symbol: BTC_USDT
   ema_fast: 50
   ema_slow: 200
 
 short_guard:
-  min_natr_perc: 1.2        # порог волатильности для шортов (в %)
-  need_close_below_ema20: true
+  min_natr_perc: 1.0
+  rsi_period: 14
+  rsi_short_max: 48
+  need_close_below_ema20: false
   slope_lookback: 3
 
 directions:
   default: {allow_long: true, allow_short: true}
-  symbol_overrides:
-    DOGE_USDT: {allow_long: false, allow_short: true}   # DOGE лонги выключены
-    ENA_USDT:  {allow_short: false}
-    HBAR_USDT: {allow_short: false}
-    WIF_USDT:  {allow_short: false}
+  # без символ-оверрайдов: все пары и оба направления разрешены
 
 quality:
   max_positions_per_symbol: 1
-  max_trades_per_symbol_per_day_by_regime: {calm: 2, normal: 3, high: 4}
+  # верхние пределы, чтобы не улететь в гиперактивность; 5–6/день дадут 7 пар × (1–2)/день
+  max_trades_per_symbol_per_day_by_regime: {calm: 1, normal: 2, high: 2}
 
 fees: {maker_bps: 2, taker_bps: 5}
 slippage: {base_spread_mult: 1.0, stress_spread_mult: 2.0}

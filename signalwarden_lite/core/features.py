@@ -17,7 +17,15 @@ def atr(df: pd.DataFrame, period: int = 14) -> pd.Series:
     """Calculate Average True Range"""
     return true_range(df).rolling(period, min_periods=1).mean()
 
-def add_indicators(df: pd.DataFrame, ema_fast: int = 50, ema_slow: int = 200, atr_p: int = 14) -> pd.DataFrame:
+def rsi(close: pd.Series, period: int = 14) -> pd.Series:
+    """Calculate RSI indicator"""
+    delta = close.diff()
+    gain = delta.clip(lower=0).rolling(period).mean()
+    loss = (-delta.clip(upper=0)).rolling(period).mean()
+    rs = gain / loss.replace(0, np.nan)
+    return 100 - (100 / (1 + rs))
+
+def add_indicators(df: pd.DataFrame, ema_fast: int = 50, ema_slow: int = 200, atr_p: int = 14, rsi_p: int = 14) -> pd.DataFrame:
     """Add technical indicators to dataframe"""
     out = df.copy()
     
@@ -28,6 +36,9 @@ def add_indicators(df: pd.DataFrame, ema_fast: int = 50, ema_slow: int = 200, at
     # ATR and normalized ATR
     out['atr'] = atr(out, atr_p)
     out['natr'] = 100.0 * (out['atr'] / out['close'])
+    
+    # RSI for momentum
+    out['rsi'] = rsi(out['close'], rsi_p)
     
     return out
 
