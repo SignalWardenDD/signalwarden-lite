@@ -1,0 +1,96 @@
+profile: v1_3_T
+
+symbols: [ADA_USDT, DOGE_USDT, ENA_USDT, HBAR_USDT, LTC_USDT, PNUT_USDT, WIF_USDT]
+timeframes: 
+  primary: 1h
+  confirm: 15m
+
+# Риск и размер - фиксированная маржа с плечом
+risk:
+  mode: fixed_margin
+  margin_usdt: 15          # фикс маржа на сделку
+  leverage: 5              # плечо ×5 → номинал 75 USDT
+  sl_atr_mult: 1.5
+  # без ранних срезов, только SL+трейлинг
+  cutloss_early: 
+    enabled: false
+
+# ТОЛЬКО трейлинг (частичных TP нет)
+trailing:
+  move_to_be_at_R: 0.55    # когда перевести в BE
+  be_offset_R: 0.06        # +δR поверх BE, чтобы покрыть комиссии/спрэд
+  activate_R: 0.35         # откуда начинать шаговый трейлинг
+  step_R: 0.25             # шаг R для подтяжек
+  chandelier_k_atr: 3.0    # Chandelier-ATR доп. ограничитель
+
+regime:
+  natr_period: 14
+  calm_thresholds: 
+    ultra_calm: 0.8
+    calm: 1.2
+    high: 2.5
+
+# Сигналы - агрессивный набор сетапов
+signals:
+  dynamic_lookback: 
+    calm: 26
+    normal: 18
+    high: 10
+  atr_cushion:      
+    calm: 0.30
+    normal: 0.12
+    high: 0.08
+  ltf_thinbar_k: 0.25
+  setups:
+    breakout:           
+      enabled: true
+    micro_breakout:     
+      enabled: true
+      lookback: 
+        normal: 10
+        high: 6
+      cushion_k_atr: 
+        normal: 0.08
+        high: 0.05
+    trend_continuation: 
+      enabled: true
+      min_body_k_range: 0.65
+      confirm_close_k_body: 0.30
+    squeeze_breakout:   
+      enabled: true
+      bb_period: 20
+      bb_k: 2.0
+      width_k_perc: 6.0
+
+# BTC-контекст (шортим только при реальном тренде вниз)
+market_filter:
+  symbol: BTC_USDT
+  ema_fast: 50
+  ema_slow: 200
+
+# Лимиты потока (без доборов, по-прежнему активно)
+quality:
+  max_positions_per_symbol: 1
+  max_trades_per_symbol_per_day_by_regime: 
+    calm: 2
+    normal: 3
+    high: 4
+
+fees: 
+  maker_bps: 2
+  taker_bps: 5
+
+slippage: 
+  base_spread_mult: 1.0
+  stress_spread_mult: 2.0
+
+exchange:  
+  id: binanceusdm
+  testnet: true
+  rate_limit: true
+
+execution: 
+  maker_first: true
+  ttl_seconds: 8
+  fallback_market: true
+  manage_stop: true

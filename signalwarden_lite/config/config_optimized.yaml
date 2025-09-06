@@ -1,0 +1,98 @@
+profile: lite_v1.1_optimized
+# Оптимизированная конфигурация на основе результатов бэктеста
+# Только лучшие пары с PF >= 2.0
+symbols: [ADA_USDT, LTC_USDT, WIF_USDT]
+timeframes:
+  primary: 1h
+  confirm: 15m
+
+risk:
+  mode: fixed_notional
+  notional_usdt: 15
+  sl_atr_mult: 1.5
+  cutloss_early: 
+    enabled: false  # Отключен - ухудшает результаты
+    bars: 2
+    threshold_R: -0.7
+
+partials:
+  - take_R: 1.0
+    size_pct: 0.15
+  - take_R: 2.0
+    size_pct: 0.25
+  - take_R: 3.2
+    size_pct: 0.60
+
+trailing:
+  activate_R: 0.3
+  step_R: 0.3
+  move_to_be_at_R: 1.0
+
+regime:
+  natr_period: 14
+  calm_thresholds: 
+    ultra_calm: 0.8
+    calm: 1.2
+    high: 2.5
+
+signals:
+  swing_lookback: 20                  # legacy
+  dynamic_lookback: 
+    calm: 28
+    normal: 20
+    high: 14
+  atr_cushion:
+    calm: 0.28
+    normal: 0.15
+    high: 0.10
+  ltf_thinbar_k: 0.25
+
+  setups:                             
+    breakout:  
+      enabled: true                   # Основной рабочий сетап
+    pullback:  
+      enabled: false                  # Не сработал на данных
+      ema_fast: 20
+      ema_slow: 50
+      retrace_band_k_atr: 0.2
+    inside_bar:
+      enabled: false                  # Не сработал на данных
+      min_prev_range_k_atr: 0.6
+
+position_context:
+  block_long_if_open_long_R_below: -0.8
+  allow_add_short_if_open_short_R_above: 1.2
+  add_pos_size_pct: 50
+
+quality:
+  max_positions_per_symbol: 1
+  max_trades_per_symbol_per_day: 3
+  stop_if_two_losses_per_day: true
+
+execution:
+  maker_first: true
+  ttl_seconds: 8
+  fallback_market: true
+
+fees:
+  maker_bps: 2
+  taker_bps: 5
+
+slippage:
+  base_spread_mult: 1.0
+  stress_spread_mult: 2.0
+
+backtest:
+  wfo: 
+    train_days: 120
+    test_days: 30
+    windows: 6
+  monte_carlo: 
+    runs: 500
+    block_bootstrap: 20
+  latency_ms: 350
+
+exchange:
+  id: binanceusdm
+  testnet: true
+  rate_limit: true

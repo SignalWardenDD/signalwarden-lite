@@ -1,0 +1,100 @@
+{
+  "PNUT/USDT": {
+    "last_update": "2025-08-23T20:25:11.672448",
+    "candles_count": 200,
+    "timeframe": "1h",
+    "first_candle": "2025-02-05T00:00:00",
+    "last_candle": "2025-08-23T00:00:00"
+  },
+  "HBAR/USDT": {
+    "last_update": "2025-08-23T20:25:15.100803",
+    "candles_count": 200,
+    "timeframe": "1h",
+    "first_candle": "2022-01-11T00:00:00",
+    "last_candle": "2022-07-29T00:00:00"
+  },
+  "DOGE/USDT": {
+    "last_update": "2025-08-24T11:19:14.289549",
+    "candles_count": 200,
+    "timeframe": "1h",
+    "first_candle": "2021-05-06T00:00:00",
+    "last_candle": "2021-11-21T00:00:00"
+  },
+  "LTC/USDT": {
+    "last_update": "2025-08-23T20:25:16.727101",
+    "candles_count": 200,
+    "timeframe": "1h",
+    "first_candle": "2020-11-04T00:00:00",
+    "last_candle": "2021-05-22T00:00:00"
+  },
+  "WIF/USDT": {
+    "last_update": "2025-08-23T20:25:10.241750",
+    "candles_count": 200,
+    "timeframe": "1h",
+    "first_candle": "2024-11-13T00:00:00",
+    "last_candle": "2025-05-31T00:00:00"
+  },
+  "ADA/USDT": {
+    "last_update": "2025-08-24T11:19:16.081104",
+    "candles_count": 200,
+    "timeframe": "1h",
+    "first_candle": "2020-11-26T00:00:00",
+    "last_candle": "2021-06-13T00:00:00"
+  },
+  "ENA/USDT": {
+    "last_update": "2025-08-24T11:19:12.492304",
+    "candles_count": 200,
+    "timeframe": "1h",
+    "first_candle": "2025-01-27T00:00:00",
+    "last_candle": "2025-08-14T00:00:00"
+  },
+  "ENA/USDT:USDT": {
+    "last_update": "2025-08-29T19:07:35.526634",
+    "candles_count": 100,
+    "timeframe": "15m",
+    "first_candle": "2025-05-07T00:00:00",
+    "last_candle": "2025-08-14T00:00:00"
+  },
+  "WIF/USDT:USDT": {
+    "last_update": "2025-08-29T19:07:36.214884",
+    "candles_count": 100,
+    "timeframe": "15m",
+    "first_candle": "2025-02-21T00:00:00",
+    "last_candle": "2025-05-31T00:00:00"
+  },
+  "ADA/USDT:USDT": {
+    "last_update": "2025-08-29T19:07:36.871512",
+    "candles_count": 100,
+    "timeframe": "15m",
+    "first_candle": "2021-03-06T00:00:00",
+    "last_candle": "2021-06-13T00:00:00"
+  },
+  "PNUT/USDT:USDT": {
+    "last_update": "2025-08-29T19:07:37.511217",
+    "candles_count": 100,
+    "timeframe": "15m",
+    "first_candle": "2025-05-21T00:00:00",
+    "last_candle": "2025-08-28T00:00:00"
+  },
+  "HBAR/USDT:USDT": {
+    "last_update": "2025-08-29T19:07:38.158256",
+    "candles_count": 100,
+    "timeframe": "15m",
+    "first_candle": "2022-04-21T00:00:00",
+    "last_candle": "2022-07-29T00:00:00"
+  },
+  "DOGE/USDT:USDT": {
+    "last_update": "2025-08-29T19:07:38.806788",
+    "candles_count": 100,
+    "timeframe": "15m",
+    "first_candle": "2021-08-14T00:00:00",
+    "last_candle": "2021-11-21T00:00:00"
+  },
+  "LTC/USDT:USDT": {
+    "last_update": "2025-08-29T12:14:10.508544",
+    "candles_count": 100,
+    "timeframe": "15m",
+    "first_candle": "2021-02-12T00:00:00",
+    "last_candle": "2021-05-22T00:00:00"
+  }
+}
