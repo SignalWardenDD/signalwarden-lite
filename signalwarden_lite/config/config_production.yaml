@@ -1,0 +1,165 @@
+# SignalWarden Lite v1.6-TXB Production Configuration
+# 🚨 IMPORTANT: Set testnet: false for LIVE TRADING!
+
+profile: v1_6_TXB_production
+
+# Trading pairs - all pairs active with adaptive shorts
+symbols: [ADA_USDT, LTC_USDT, DOGE_USDT, ENA_USDT, HBAR_USDT, WIF_USDT, PNUT_USDT]
+
+# Multi-timeframe strategy
+timeframes: 
+  primary: 1h    # Breakout signals
+  ltf: 15m       # Inside/Trend/Squeeze signals
+
+# Risk management - conservative for live trading
+risk:
+  mode: fixed_margin
+  margin_usdt: 15        # $15 margin per trade
+  leverage: 5            # 5x leverage = $75 notional
+  sl_atr_mult: 1.5       # Stop loss at 1.5x ATR
+  cutloss_early: 
+    enabled: false       # Disabled for v1.6-TXB (trailing-only)
+
+# Profit-first trailing system
+trailing:
+  move_to_be_at_R: 0.35   # Move to BE at 35% of R
+  be_offset_R: 0.08       # BE offset 8% of R (covers fees)
+  activate_R: 0.35        # Start trailing at 35% R
+  step_R: 0.20           # Trail step 20% of R
+  chandelier_k_atr: 3.5   # Chandelier 3.5x ATR
+
+# Market regime classification
+regime:
+  natr_period: 14
+  calm_thresholds: 
+    ultra_calm: 0.8      # NATR < 0.8%
+    calm: 1.2           # NATR < 1.2%
+    high: 2.5           # NATR > 2.5%
+
+# Signal generation parameters
+signals:
+  # MTF setup assignment
+  setup_timeframes: 
+    breakout: 1h           # Primary breakout on 1h
+    inside_bar: 15m        # Inside bar on 15m
+    trend_continuation: 15m # Trend continuation on 15m  
+    squeeze_breakout: 15m   # Squeeze on 15m
+    
+  # Dynamic swing lookbacks by regime
+  dynamic_lookback: 
+    calm: 24        # 24 bars in calm markets
+    normal: 16      # 16 bars in normal markets
+    high: 10        # 10 bars in high volatility
+    
+  # Asymmetric ATR cushions (shorts wider to avoid false breakdowns)
+  atr_cushion_long:  
+    calm: 0.30
+    normal: 0.12
+    high: 0.08
+  atr_cushion_short: 
+    calm: 0.34      # Wider for shorts
+    normal: 0.16    # Wider for shorts
+    high: 0.12      # Wider for shorts
+    
+  # Thin bar filter (noise reduction)
+  ltf_thinbar_k: 0.25     # Skip bars < 25% of ATR range
+  
+  # Setup configurations
+  setups:
+    breakout:           
+      enabled: true
+    inside_bar:         
+      enabled: true
+      min_prev_range_k_atr: 0.30    # Previous bar must be > 30% ATR
+    trend_continuation: 
+      enabled: true
+      min_body_k_range: 0.45        # Body must be > 45% of range
+      confirm_close_k_body: 0.18    # Close confirmation threshold
+    squeeze_breakout:   
+      enabled: true
+      bb_period: 20                 # Bollinger Bands period
+      bb_k: 2.0                     # BB standard deviations
+      width_k_perc: 12.0            # Width threshold %
+    micro_breakout:     
+      enabled: false                # Disabled (unprofitable)
+
+# BTC market context filter (CRITICAL for adaptive shorts)
+market_filter:
+  symbol: BTC_USDT
+  ema_fast: 50          # EMA50
+  ema_slow: 200         # EMA200
+
+# ADAPTIVE SHORT-GUARD (v1.6-TXB breakthrough feature)
+short_guard:
+  # Bear market shorts (when BTC mkt_short_ok = True)
+  rsi_bear_max: 52        # RSI must be <= 52 in bear market
+  min_natr_bear: 0.9      # NATR must be >= 0.9% in bear market
+  
+  # Bull market correction shorts (when BTC mkt_short_ok = False)
+  rsi_bullcorr_max: 50    # RSI must be <= 50 in bull corrections
+  min_natr_bullcorr: 0.8  # NATR must be >= 0.8% in bull corrections
+  require_close_below_ema20_bullcorr: true  # Must close below EMA20
+  
+  # Common parameters
+  slope_lookback: 3       # EMA slope lookback bars
+  rsi_period: 14          # RSI calculation period
+
+# Direction permissions (all enabled - guards will filter)
+directions:
+  default: 
+    allow_long: true
+    allow_short: true
+
+# Quality control limits
+quality:
+  max_positions_per_symbol: 1     # One position per symbol
+  max_trades_per_symbol_per_day_by_regime: 
+    calm: 1         # Max 1 trade/day in calm markets
+    normal: 2       # Max 2 trades/day in normal markets
+    high: 2         # Max 2 trades/day in high volatility
+
+# Fee structure (Binance USDM futures)
+fees:
+  maker_bps: 2              # 0.02% maker fee
+  taker_bps: 5              # 0.05% taker fee
+  entry_liquidity: maker_first  # Try maker first, fallback to taker
+
+# Slippage assumptions (conservative)
+slippage:
+  bps_entry: 0              # No additional slippage (covered by spread)
+  bps_exit: 0               # No additional slippage
+
+# Exchange configuration
+exchange:  
+  id: binanceusdm
+  testnet: true             # 🚨 SET TO false FOR LIVE TRADING!
+  rate_limit: true          # Respect API rate limits
+
+# Execution parameters
+execution: 
+  maker_first: true         # Try limit orders first
+  ttl_seconds: 8            # Order time-to-live
+  fallback_market: true     # Fallback to market orders
+  manage_stop: true         # Auto-manage stop losses
+
+# Logging configuration
+logging:
+  level: INFO               # INFO, DEBUG, WARNING, ERROR
+  file: "signalwarden_v1_6_TXB.log"
+  max_size_mb: 100          # Max log file size
+  backup_count: 5           # Number of backup files
+
+# Monitoring and alerts (optional)
+monitoring:
+  enabled: false            # Set to true to enable
+  telegram:
+    bot_token: ""           # Telegram bot token
+    chat_id: ""             # Chat ID for alerts
+  discord:
+    webhook_url: ""         # Discord webhook URL
+    
+# Performance tracking
+performance:
+  track_trades: true        # Track all trades
+  daily_reports: true       # Generate daily P&L reports
+  export_csv: true          # Export trades to CSV
