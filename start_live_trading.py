@@ -26,6 +26,10 @@ def check_environment():
     if not os.path.exists('.env'):
         logger.error("❌ .env file not found! Create it with your Binance API credentials.")
         return False
+    
+    # Load .env file
+    from dotenv import load_dotenv
+    load_dotenv()
         
     # Check API credentials
     api_key = os.getenv('BINANCE_API_KEY')
