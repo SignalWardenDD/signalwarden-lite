@@ -3,11 +3,102 @@ from .types import Position, Side
 
 @dataclass
 class TrailingConfig:
+    # Новая система трейлинга по уровням PnL в USDT
+    activate_pnl_usdt: float = 0.10      # Активация трейлинга при 0.10 USDT PnL
+    
+    # Уровни сохранения прибыли
+    level_1_pnl: float = 0.10           # 0.10 USDT - сохранить 50%
+    level_1_keep_pct: float = 0.50      # 50%
+    
+    level_2_pnl: float = 0.20           # 0.20 USDT - сохранить 60%
+    level_2_keep_pct: float = 0.60      # 60%
+    
+    level_3_pnl: float = 0.30           # 0.30 USDT - сохранить 70%
+    level_3_keep_pct: float = 0.70      # 70%
+    
+    level_4_pnl: float = 0.40           # 0.40+ USDT - сохранить 80%
+    level_4_keep_pct: float = 0.80      # 80%
+    
+    # Старые параметры для обратной совместимости
     activate_R: float = 0.35         # откуда начинать шаговый трейлинг
     step_R: float = 0.25             # шаг R для подтяжек
     move_to_be_at_R: float = 0.55    # когда перевести в BE
     be_offset_R: float = 0.06        # +δR поверх BE, чтобы покрыть комиссии/проскальзывание
     chandelier_k_atr: float = 3.0    # Chandelier-ATR доп. ограничитель
+
+def update_trailing_pnl_based(pos: Position, current_price: float, current_pnl_usdt: float, cfg: TrailingConfig) -> Position:
+    """
+    Новая система трейлинга на основе PnL в USDT
+    Уровневая система сохранения прибыли: 50%/60%/70%/80%
+    Никогда не ухудшает SL, только улучшает
+    """
+    
+    # Активация трейлинга только при достижении минимального PnL
+    if current_pnl_usdt < cfg.activate_pnl_usdt:
+        return pos
+    
+    # Обновляем максимальный PnL (только улучшаем)
+    pos.peak_pnl_usdt = max(pos.peak_pnl_usdt, current_pnl_usdt)
+    
+    # КРИТИЧЕСКИ ВАЖНО: Определяем уровень сохранения прибыли по МАКСИМАЛЬНОМУ PnL
+    if pos.peak_pnl_usdt >= cfg.level_4_pnl:
+        keep_pct = cfg.level_4_keep_pct  # 80%
+        level_name = "L4"
+    elif pos.peak_pnl_usdt >= cfg.level_3_pnl:
+        keep_pct = cfg.level_3_keep_pct  # 70%
+        level_name = "L3"
+    elif pos.peak_pnl_usdt >= cfg.level_2_pnl:
+        keep_pct = cfg.level_2_keep_pct  # 60%
+        level_name = "L2"
+    else:
+        keep_pct = cfg.level_1_keep_pct  # 50%
+        level_name = "L1"
+    
+    # Рассчитываем целевую прибыль для сохранения
+    target_profit_usdt = pos.peak_pnl_usdt * keep_pct
+    
+    # Добавляем отладочную информацию
+    pos.trailing_debug = {
+        'level': level_name,
+        'keep_pct': keep_pct,
+        'peak_pnl': pos.peak_pnl_usdt,
+        'target_profit': target_profit_usdt,
+        'current_pnl': current_pnl_usdt,
+        'sl_updated': False
+    }
+    
+    # Сохраняем старый SL для сравнения
+    old_sl = pos.sl
+    
+    # Рассчитываем новый stop loss на основе целевой прибыли
+    if pos.side == Side.LONG:
+        # Для лонгов: entry + target_profit_usdt / qty
+        quantity = abs(pos.qty)
+        if quantity > 0:
+            new_sl = pos.entry + (target_profit_usdt / quantity)
+            # Никогда не ухудшаем SL для лонгов (только увеличиваем)
+            if new_sl > pos.sl:
+                pos.sl = new_sl
+                pos.trailing_debug['sl_updated'] = True
+                
+    else:  # SHORT
+        # Для шортов: entry - target_profit_usdt / qty
+        quantity = abs(pos.qty)
+        if quantity > 0:
+            new_sl = pos.entry - (target_profit_usdt / quantity)
+            # Никогда не ухудшаем SL для шортов (только уменьшаем)
+            if new_sl < pos.sl:
+                pos.sl = new_sl
+                pos.trailing_debug['sl_updated'] = True
+    
+    # Обновляем отладочную информацию
+    pos.trailing_debug.update({
+        'old_sl': old_sl,
+        'new_sl': pos.sl,
+        'sl_updated': pos.sl != old_sl
+    })
+    
+    return pos
 
 def update_trailing_hybrid(pos: Position, hi: float, lo: float, atr: float, cfg: TrailingConfig) -> Position:
     """

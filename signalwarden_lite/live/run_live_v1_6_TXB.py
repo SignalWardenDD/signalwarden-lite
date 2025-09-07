@@ -11,6 +11,7 @@ import os
 import time
 import yaml
 import argparse
+import threading
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import ccxt
@@ -144,12 +145,537 @@ class SignalWardenLive:
         # Storage
         self.storage = JSONStore('trading_state_v1_6_TXB.json')
         
-        # Risk parameters
-        self.margin_usdt = self.cfg['risk']['margin_usdt']
-        self.leverage = self.cfg['risk']['leverage']
-        self.base_notional = self.margin_usdt * self.leverage  # 75 USDT
+        # Risk parameters - FIXED: margin_usdt is NOTIONAL size, not actual margin
+        self.margin_usdt = self.cfg['risk']['margin_usdt']  # 21 USDT notional per trade
+        self.leverage = self.cfg['risk']['leverage']  # 5x leverage
+        self.sl_atr_mult = self.cfg['risk']['sl_atr_mult']  # 1.5x ATR for SL
         
-        logger.info(f"⚙️ Risk per trade: {self.margin_usdt} USDT margin × {self.leverage} = {self.base_notional} USDT notional")
+        # Active positions tracking (1 position per symbol max)
+        self.active_positions = {}  # symbol -> position_info
+        
+        # Sync positions from exchange on startup
+        self.sync_positions_from_exchange()
+        
+        # Trailing thread control
+        self.trailing_thread = None
+        self.trailing_stop_event = threading.Event()
+        
+        logger.info(f"⚙️ Risk per trade: {self.margin_usdt} USDT notional ({self.margin_usdt/self.leverage:.1f} USDT actual margin)")
+        
+    def sync_positions_from_exchange(self):
+        """Sync positions from Binance exchange"""
+        if self.paper_mode:
+            return
+            
+        try:
+            positions = self.exchange.fetch_positions()
+            logger.info(f"📊 Syncing positions from exchange...")
+            
+            synced_count = 0
+            for pos in positions:
+                if float(pos['contracts']) == 0:  # No position
+                    continue
+                    
+                symbol_ccxt = pos['symbol']  # ADA/USDT:USDT format
+                if ':USDT' not in symbol_ccxt:
+                    continue
+                    
+                # Convert to our format: ADA/USDT:USDT -> ADA_USDT
+                base_quote = symbol_ccxt.split(':')[0]  # ADA/USDT
+                symbol = base_quote.replace('/', '_')   # ADA_USDT
+                
+                if symbol not in self.cfg['symbols']:
+                    continue
+                    
+                # Calculate stop loss levels for synced position
+                try:
+                    # Get recent data to calculate ATR
+                    ccxt_sym = self.ccxt_symbol(symbol)
+                    df = self.fetch_recent_data(ccxt_sym, '1h', 100)
+                    
+                    if df is not None and len(df) > 0:
+                        # Calculate ATR
+                        df['hl'] = df['high'] - df['low']
+                        df['hc'] = abs(df['high'] - df['close'].shift())
+                        df['lc'] = abs(df['low'] - df['close'].shift())
+                        df['tr'] = df[['hl', 'hc', 'lc']].max(axis=1)
+                        atr = df['tr'].rolling(window=14).mean().iloc[-1]
+                        
+                        # Calculate stop loss
+                        entry_price = float(pos['entryPrice'])
+                        side = 'LONG' if pos['side'] == 'long' else 'SHORT'
+                        
+                        if side == 'LONG':
+                            sl_price = entry_price - (self.sl_atr_mult * atr)
+                        else:
+                            sl_price = entry_price + (self.sl_atr_mult * atr)
+                    else:
+                        # Fallback: use 2% stop loss if no data
+                        entry_price = float(pos['entryPrice'])
+                        side = 'LONG' if pos['side'] == 'long' else 'SHORT'
+                        
+                        if side == 'LONG':
+                            sl_price = entry_price * 0.98
+                        else:
+                            sl_price = entry_price * 1.02
+                        atr = entry_price * 0.02  # 2% fallback
+                        
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not calculate SL for {symbol}: {e}, using 2% fallback")
+                    entry_price = float(pos['entryPrice'])
+                    side = 'LONG' if pos['side'] == 'long' else 'SHORT'
+                    
+                    if side == 'LONG':
+                        sl_price = entry_price * 0.98
+                    else:
+                        sl_price = entry_price * 1.02
+                    atr = entry_price * 0.02
+                
+                # Create position info from exchange data
+                position_info = {
+                    'symbol': symbol,
+                    'side': 'LONG' if pos['side'] == 'long' else 'SHORT',
+                    'entry': float(pos['entryPrice']),
+                    'qty': abs(float(pos['contracts'])),
+                    'sl_initial': sl_price,
+                    'sl_current': sl_price,
+                    'atr': atr,
+                    'timestamp': time.time(),
+                    'order_id': None,
+                    'trailing_active': False,
+                    'unrealized_pnl': float(pos['unrealizedPnl']),
+                    'peak_pnl_usdt': 0.0,  # Track maximum PnL for trailing
+                    'synced_from_exchange': True
+                }
+                
+                self.active_positions[symbol] = position_info
+                synced_count += 1
+                
+                # Place stop loss order for synced position
+                try:
+                    self.update_sliding_stop_loss(symbol, position_info)
+                    logger.info(f"📍 Synced {symbol}: {position_info['side']} @ {position_info['entry']:.6f}, "
+                              f"Qty: {position_info['qty']:.6f}, SL: {sl_price:.6f}, PnL: {position_info['unrealized_pnl']:.2f} USDT")
+                except Exception as sl_error:
+                    logger.warning(f"⚠️ Could not place SL order for synced position {symbol}: {sl_error}")
+                    logger.info(f"📍 Synced {symbol}: {position_info['side']} @ {position_info['entry']:.6f}, "
+                              f"Qty: {position_info['qty']:.6f}, SL: {sl_price:.6f} (NO SL ORDER), PnL: {position_info['unrealized_pnl']:.2f} USDT")
+                          
+            logger.info(f"✅ Synced {synced_count} positions from exchange")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to sync positions from exchange: {e}")
+    
+    def has_open_position(self, symbol: str) -> bool:
+        """Check if symbol has an open position"""
+        return symbol in self.active_positions
+    
+    def can_open_new_position(self) -> bool:
+        """Check if we have enough balance for a new position"""
+        if self.paper_mode:
+            return len(self.active_positions) < len(self.cfg['symbols'])
+            
+        try:
+            # Get current balance
+            balance = self.exchange.fetch_balance()
+            free_usdt = balance.get('USDT', {}).get('free', 0)
+            
+            # With 5x leverage, margin_usdt is NOTIONAL, actual margin = notional/leverage
+            # Small buffer for fees (~0.1% entry + 0.1% exit = 0.2% total)  
+            actual_margin_per_position = self.margin_usdt / self.leverage  # Real margin needed
+            required_margin = actual_margin_per_position * 1.05  # 5% buffer for fees
+            
+            if free_usdt < required_margin:
+                logger.debug(f"Insufficient balance: {free_usdt:.2f} USDT free, need {required_margin:.2f} USDT")
+                return False
+                
+            # Also check we don't exceed max positions per symbol limit
+            current_positions = len(self.active_positions)  # Use tracked positions
+            max_total_positions = len(self.cfg['symbols'])  # 1 position per symbol
+            
+            if current_positions >= max_total_positions:
+                logger.debug(f"Max positions reached: {current_positions}/{max_total_positions}")
+                return False
+                
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error checking balance for new position: {e}")
+            return False  # Conservative: don't open on error
+        
+    def get_position_pnl_from_exchange(self, symbol: str) -> float:
+        """Get real-time PnL from exchange"""
+        if self.paper_mode:
+            return 0.0
+            
+        try:
+            ccxt_sym = self.ccxt_symbol(symbol)
+            positions = self.exchange.fetch_positions([ccxt_sym])
+            
+            for pos in positions:
+                if float(pos['contracts']) != 0:
+                    return float(pos['unrealizedPnl'])
+                    
+            return 0.0
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to get PnL for {symbol}: {e}")
+            return 0.0
+        
+    def start_trailing_thread(self):
+        """Start fast trailing updates in separate thread"""
+        if self.trailing_thread and self.trailing_thread.is_alive():
+            return
+            
+        self.trailing_stop_event.clear()
+        self.trailing_thread = threading.Thread(target=self._fast_trailing_loop, daemon=True)
+        self.trailing_thread.start()
+        logger.info("🔄 Fast trailing thread started (3-second updates)")
+        
+    def stop_trailing_thread(self):
+        """Stop trailing thread"""
+        if self.trailing_thread and self.trailing_thread.is_alive():
+            self.trailing_stop_event.set()
+            self.trailing_thread.join(timeout=5)
+            logger.info("⏹️ Fast trailing thread stopped")
+            
+    def _fast_trailing_loop(self):
+        """Fast trailing updates every 3 seconds"""
+        while not self.trailing_stop_event.is_set():
+            try:
+                self.update_trailing_stops()
+                self.trailing_stop_event.wait(3)  # 3-second updates
+            except Exception as e:
+                logger.error(f"❌ Fast trailing error: {e}")
+                self.trailing_stop_event.wait(3)
+    
+    def update_trailing_stops(self):
+        """Update trailing stops for all open positions with real PnL from Binance"""
+        if not self.active_positions:
+            return
+            
+        for symbol, pos in list(self.active_positions.items()):
+            try:
+                # Get current price and PnL from exchange
+                df = self.fetch_ohlcv(symbol, '1m', 5)
+                if df.empty:
+                    continue
+                    
+                current_price = float(df.iloc[-1]['close'])
+                real_pnl = self.get_position_pnl_from_exchange(symbol)
+                
+                # Update position with real PnL
+                pos['unrealized_pnl'] = real_pnl
+                
+                # Calculate ATR if missing (for synced positions)
+                if pos['atr'] is None:
+                    df_atr = self.fetch_ohlcv(symbol, '1h', 50)
+                    if not df_atr.empty:
+                        df_atr = add_indicators(df_atr, atr_p=14)
+                        pos['atr'] = float(df_atr.iloc[-1]['atr'])
+                        pos['sl_initial'] = pos['entry'] - (self.sl_atr_mult * pos['atr']) if pos['side'] == 'LONG' else pos['entry'] + (self.sl_atr_mult * pos['atr'])
+                        pos['sl_current'] = pos['sl_initial']
+                
+                if pos['atr'] is None:  # Still None, skip
+                    continue
+                
+                # Update trailing logic using new PnL-based system
+                from ..core.trailing import update_trailing_pnl_based
+                from ..core.types import Position, Side
+                
+                # Convert to Position object
+                position = Position(
+                    side=Side.LONG if pos['side'] == 'LONG' else Side.SHORT,
+                    entry=pos['entry'],
+                    sl=pos['sl_current'] if pos['sl_current'] else pos['sl_initial'],
+                    sl_initial=pos['sl_initial'],
+                    qty=pos['qty'],
+                    remaining_qty=pos['qty'],
+                    r_per_unit=pos['atr'] * self.sl_atr_mult
+                )
+                
+                # Add peak_pnl_usdt tracking to Position object
+                position.peak_pnl_usdt = pos.get('peak_pnl_usdt', 0.0)
+                
+                # Use new PnL-based trailing system
+                updated_pos = update_trailing_pnl_based(
+                    position, 
+                    current_price,
+                    real_pnl,  # Current PnL in USDT from Binance
+                    self.trailing
+                )
+                
+                # Check if SL hit
+                sl_hit = False
+                if pos['side'] == 'LONG' and current_price <= updated_pos.sl:
+                    sl_hit = True
+                elif pos['side'] == 'SHORT' and current_price >= updated_pos.sl:
+                    sl_hit = True
+                    
+                if sl_hit:
+                    self.close_position(symbol, current_price, "Trailing SL Hit")
+                else:
+                    # CRITICAL: Only improve SL, never degrade it
+                    should_update = False
+                    if pos['side'] == 'LONG' and updated_pos.sl > pos['sl_current']:
+                        should_update = True  # SL moves up for longs
+                    elif pos['side'] == 'SHORT' and updated_pos.sl < pos['sl_current']:
+                        should_update = True  # SL moves down for shorts
+                        
+                    if should_update:
+                        old_sl = pos['sl_current']
+                        pos['sl_current'] = updated_pos.sl
+                        pos['trailing_active'] = True
+                        
+                        # Save updated peak PnL
+                        pos['peak_pnl_usdt'] = updated_pos.peak_pnl_usdt
+                        
+                        # Update sliding market stop loss on exchange
+                        self.update_sliding_stop_loss(symbol, pos)
+                        
+                        # Log trailing update with detailed debug info
+                        direction = "🟢" if pos['side'] == 'LONG' else "🔴"
+                        
+                        # Get debug info from trailing function
+                        debug_info = getattr(updated_pos, 'trailing_debug', {})
+                        level_info = f" ({debug_info.get('level', 'L?')}: {debug_info.get('keep_pct', 0)*100:.0f}%)"
+                        
+                        logger.info(f"{direction} {symbol}: Trailing SL {old_sl:.6f} → {updated_pos.sl:.6f}, PnL: {real_pnl:.2f} USDT{level_info}")
+                        
+                        # Additional debug logging
+                        if debug_info:
+                            logger.debug(f"📊 {symbol} Trailing Debug: Peak={debug_info.get('peak_pnl', 0):.2f}, Target={debug_info.get('target_profit', 0):.2f}, Updated={debug_info.get('sl_updated', False)}")
+                        
+            except Exception as e:
+                logger.error(f"❌ Trailing update failed for {symbol}: {e}")
+                
+    def close_position(self, symbol: str, exit_price: float, reason: str):
+        """Close position and clean up"""
+        if symbol not in self.active_positions:
+            return
+            
+        try:
+            pos = self.active_positions[symbol]
+            
+            # Check if position still exists on exchange first
+            ccxt_sym = self.ccxt_symbol(symbol)
+            
+            if not self.paper_mode:
+                try:
+                    exchange_positions = self.exchange.fetch_positions([ccxt_sym])
+                    position_exists = False
+                    
+                    for exchange_pos in exchange_positions:
+                        if float(exchange_pos['contracts']) != 0:
+                            position_exists = True
+                            break
+                    
+                    if not position_exists:
+                        logger.info(f"📊 {symbol}: Position already closed on exchange")
+                        # Remove from tracking
+                        del self.active_positions[symbol]
+                        self.storage.update_symbol(symbol, {'active_position': None})
+                        return
+                except Exception as pos_check_error:
+                    logger.warning(f"⚠️ Could not check position status for {symbol}: {pos_check_error}")
+            
+            # Place market order to close
+            close_side = 'sell' if pos['side'] == 'LONG' else 'buy'
+            
+            close_order = self.exchange.create_market_order(
+                ccxt_sym,
+                close_side,
+                pos['qty'],
+                exit_price,
+                params={'reduceOnly': True}
+            )
+            
+            # Calculate PnL
+            if pos['side'] == 'LONG':
+                pnl_usdt = (exit_price - pos['entry']) * pos['qty']
+            else:
+                pnl_usdt = (pos['entry'] - exit_price) * pos['qty']
+                
+            logger.info(f"🔚 {symbol}: Position closed @ {exit_price:.6f} ({reason}), PnL: {pnl_usdt:.2f} USDT")
+            
+            # Remove from tracking
+            del self.active_positions[symbol]
+            
+            # Update storage
+            self.storage.update_symbol(symbol, {
+                'active_position': None,
+                'last_close_time': time.time(),
+                'last_pnl': pnl_usdt
+            })
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to close position {symbol}: {e}")
+    
+    def check_active_positions(self):
+        """Check all active positions for stop loss triggers and sync with exchange"""
+        if not self.active_positions:
+            return
+            
+        logger.debug(f"🔍 Checking {len(self.active_positions)} active positions...")
+        
+        positions_to_close = []
+        
+        for symbol, pos in list(self.active_positions.items()):
+            try:
+                # Get current market price
+                ccxt_sym = self.ccxt_symbol(symbol)
+                
+                if not self.paper_mode:
+                    # Verify position still exists on exchange
+                    try:
+                        exchange_positions = self.exchange.fetch_positions([ccxt_sym])
+                        position_exists = False
+                        
+                        for exchange_pos in exchange_positions:
+                            if float(exchange_pos['contracts']) != 0:
+                                position_exists = True
+                                break
+                        
+                        if not position_exists:
+                            logger.info(f"📊 {symbol}: Position no longer exists on exchange, removing from tracking")
+                            positions_to_close.append(symbol)
+                            continue
+                            
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not verify {symbol} position on exchange: {e}")
+                        continue
+                
+                # Get current price
+                ticker = self.exchange.fetch_ticker(ccxt_sym)
+                current_price = ticker['last']
+                
+                # Check stop loss trigger
+                sl_price = pos.get('sl_current') or pos.get('sl_initial')
+                if not sl_price:
+                    logger.warning(f"⚠️ {symbol}: No stop loss price set!")
+                    continue
+                
+                should_close = False
+                
+                if pos['side'] == 'LONG':
+                    # For longs: close if current price <= stop loss
+                    if current_price <= sl_price:
+                        should_close = True
+                        logger.warning(f"🚨 {symbol} LONG SL HIT: Price ${current_price:.6f} <= SL ${sl_price:.6f}")
+                else:
+                    # For shorts: close if current price >= stop loss
+                    if current_price >= sl_price:
+                        should_close = True
+                        logger.warning(f"🚨 {symbol} SHORT SL HIT: Price ${current_price:.6f} >= SL ${sl_price:.6f}")
+                
+                if should_close:
+                    logger.error(f"💥 {symbol}: STOP LOSS TRIGGERED! Closing position immediately...")
+                    self.close_position(symbol, current_price, "STOP_LOSS_HIT")
+                    positions_to_close.append(symbol)
+                else:
+                    # Log position status
+                    pnl = pos.get('unrealized_pnl', 0)
+                    direction = "🟢" if pos['side'] == 'LONG' else "🔴"
+                    logger.debug(f"{direction} {symbol}: Price ${current_price:.6f}, SL ${sl_price:.6f}, PnL: {pnl:.2f} USDT")
+                    
+            except Exception as e:
+                logger.error(f"❌ Failed to check position {symbol}: {e}")
+        
+        # Clean up closed positions
+        for symbol in positions_to_close:
+            if symbol in self.active_positions:
+                del self.active_positions[symbol]
+                self.storage.update_symbol(symbol, {'active_position': None})
+    
+    def update_sliding_stop_loss(self, symbol: str, pos: Dict[str, Any]):
+        """Update sliding market stop loss order on exchange"""
+        if self.paper_mode:
+            return
+            
+        try:
+            ccxt_sym = self.ccxt_symbol(symbol)
+            
+            # First, check if position still exists
+            try:
+                exchange_positions = self.exchange.fetch_positions([ccxt_sym])
+                position_exists = False
+                
+                for exchange_pos in exchange_positions:
+                    if float(exchange_pos['contracts']) != 0:
+                        position_exists = True
+                        break
+                
+                if not position_exists:
+                    logger.debug(f"📊 {symbol}: No position on exchange, skipping SL update")
+                    return
+            except Exception as pos_check_error:
+                logger.warning(f"⚠️ Could not verify position for SL update {symbol}: {pos_check_error}")
+                return
+            
+            # Get existing stop loss orders first
+            old_sl_orders = []
+            try:
+                open_orders = self.exchange.fetch_open_orders(ccxt_sym)
+                for order in open_orders:
+                    if order['type'] == 'stop_market' and order['info'].get('reduceOnly'):
+                        old_sl_orders.append(order)
+                        logger.debug(f"📊 {symbol}: Found existing SL order {order['id']} @ {order['stopPrice']}")
+            except Exception as orders_error:
+                logger.warning(f"⚠️ Could not fetch open orders for {symbol}: {orders_error}")
+            
+            # Small delay to avoid rate limits
+            import time
+            time.sleep(0.1)
+            
+            # First, try to create NEW stop loss order
+            sl_side = 'sell' if pos['side'] == 'LONG' else 'buy'
+            new_sl_created = False
+            new_sl_order = None
+            
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    new_sl_order = self.exchange.create_order(
+                        ccxt_sym,
+                        'stop_market',
+                        sl_side,
+                        pos['qty'],
+                        None,
+                        params={
+                            'stopPrice': pos['sl_current'],
+                            'reduceOnly': True,
+                            'timeInForce': 'GTC'
+                        }
+                    )
+                    new_sl_created = True
+                    logger.info(f"✅ {symbol}: New SL order created @ {pos['sl_current']:.6f} (ID: {new_sl_order['id']})")
+                    break
+                except Exception as e:
+                    logger.warning(f"⚠️ {symbol}: SL creation attempt {attempt+1} failed: {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(1)  # Wait before retry
+            
+            # Only cancel old orders if new one was created successfully
+            if new_sl_created and old_sl_orders:
+                time.sleep(0.2)  # Small delay
+                for old_order in old_sl_orders:
+                    try:
+                        self.exchange.cancel_order(old_order['id'], ccxt_sym)
+                        logger.debug(f"🚫 {symbol}: Cancelled old SL order {old_order['id']}")
+                    except Exception as cancel_error:
+                        logger.warning(f"⚠️ {symbol}: Could not cancel old SL order {old_order['id']}: {cancel_error}")
+            elif not new_sl_created:
+                logger.error(f"❌ {symbol}: CRITICAL - Could not create new SL order! Position may be unprotected!")
+                if old_sl_orders:
+                    logger.warning(f"🛡️ {symbol}: Keeping {len(old_sl_orders)} existing SL orders as fallback")
+                return  # Don't proceed if we couldn't create new SL
+            
+            # Update position with new SL order ID
+            if new_sl_created and new_sl_order:
+                pos['sl_order_id'] = new_sl_order['id']
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update sliding SL for {symbol}: {e}")
         
     def ccxt_symbol(self, symbol: str) -> str:
         """Convert symbol format: ADA_USDT -> ADA/USDT:USDT"""
@@ -375,15 +901,28 @@ class SignalWardenLive:
             entry = signal['entry']
             atr = signal['atr']
             
-            # Calculate position size
-            qty = self.base_notional / entry
+            # Check if position already exists for this symbol
+            if self.has_open_position(symbol):
+                error_msg = f"❌ Position already open for {symbol} - skipping"
+                logger.warning(f"⚠️ {symbol}: {error_msg}")
+                return error_msg
+            
+            # Check if we have enough balance for new position (considering 5x leverage)
+            if not self.can_open_new_position():
+                error_msg = f"❌ Insufficient balance for new position - need {self.margin_usdt/self.leverage:.1f} USDT margin"
+                logger.warning(f"⚠️ {symbol}: {error_msg}")
+                return error_msg
+            
+            # Calculate position size: FIXED margin_usdt positions (21 USDT notional with 5x leverage)
+            # This ensures we trade with exactly margin_usdt notional value
+            position_value_usdt = self.margin_usdt  # 21 USDT notional exactly
+            qty = position_value_usdt / entry
             
             # Calculate stop loss
-            sl_atr_mult = self.cfg['risk']['sl_atr_mult']
             if side == 'LONG':
-                sl_price = entry - (sl_atr_mult * atr)
+                sl_price = entry - (self.sl_atr_mult * atr)
             else:
-                sl_price = entry + (sl_atr_mult * atr)
+                sl_price = entry + (self.sl_atr_mult * atr)
             
             ccxt_sym = self.ccxt_symbol(symbol)
             
@@ -397,19 +936,50 @@ class SignalWardenLive:
                 params={'reduceOnly': False}
             )
             
-            # Place stop loss order  
+            # Create initial stop loss order immediately
             sl_side = 'sell' if side == 'LONG' else 'buy'
-            sl_order = self.exchange.create_order(
-                ccxt_sym,
-                'stop_market',
-                sl_side,
-                qty,
-                None,  # no limit price for stop market
-                params={
-                    'stopPrice': sl_price,
-                    'reduceOnly': True
-                }
-            )
+            try:
+                sl_order = self.exchange.create_order(
+                    ccxt_sym,
+                    'stop_market',
+                    sl_side,
+                    qty,
+                    None,
+                    params={
+                        'stopPrice': sl_price,
+                        'reduceOnly': True,
+                        'timeInForce': 'GTC'
+                    }
+                )
+                sl_order_id = sl_order['id']
+                logger.info(f"🛡️ {symbol}: Stop-loss created @ {sl_price:.6f} (Order ID: {sl_order_id})")
+            except Exception as e:
+                logger.error(f"❌ {symbol}: Failed to create stop-loss: {e}")
+                sl_order_id = None
+            
+            # Track position
+            position_info = {
+                'symbol': symbol,
+                'side': side,
+                'entry': entry,
+                'qty': qty,
+                'sl_initial': sl_price,
+                'sl_current': sl_price,
+                'atr': atr,
+                'timestamp': time.time(),
+                'order_id': order['id'],
+                'sl_order_id': sl_order_id,
+                'trailing_active': False,
+                'peak_pnl_usdt': 0.0  # Initialize peak PnL tracking
+            }
+            
+            self.active_positions[symbol] = position_info
+            
+            # Save state
+            self.storage.update_symbol(symbol, {
+                'active_position': position_info,
+                'last_signal_time': time.time()
+            })
             
             result = f"✅ {side} {signal['setup']} @ {entry:.6f}, SL @ {sl_price:.6f}, Qty: {qty:.6f}"
             logger.info(f"🎯 {symbol}: {result}")
@@ -429,6 +999,11 @@ class SignalWardenLive:
         
         total_signals = 0
         executed_trades = 0
+        
+        # CRITICAL: First check and manage active positions
+        self.check_active_positions()
+        
+        # Trailing is now handled by separate thread, no need to update here
         
         for symbol in self.cfg['symbols']:
             try:
@@ -492,9 +1067,13 @@ class SignalWardenLive:
         """Main trading loop"""
         logger.info("🚀 Starting SignalWarden v1.6-TXB live trading...")
         logger.info(f"📊 Monitoring {len(self.cfg['symbols'])} symbols")
-        logger.info(f"💰 Risk per trade: {self.base_notional} USDT notional")
+        logger.info(f"💰 Risk per trade: {self.margin_usdt} USDT notional ({self.margin_usdt/self.leverage:.1f} USDT margin)")
         logger.info(f"⚙️ MTF Strategy: 1h breakout + 15m LTF setups")
         logger.info(f"🛡️ Adaptive shorts with BTC filter enabled")
+        logger.info(f"🔄 PnL-based trailing: 0.10 USDT activation, 50%/60%/70%/80% levels")
+        
+        # Start fast trailing thread
+        self.start_trailing_thread()
         
         cycle_count = 0
         
@@ -511,6 +1090,7 @@ class SignalWardenLive:
                     
                 except KeyboardInterrupt:
                     logger.info("🛑 Received interrupt signal, shutting down...")
+                    self.stop_trailing_thread()
                     break
                     
                 except Exception as e:

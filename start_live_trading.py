@@ -87,27 +87,8 @@ def check_config(config_path: str, live_mode: bool):
 
 def confirm_live_trading():
     """Confirm live trading with user"""
-    logger.warning("🚨 LIVE TRADING MODE CONFIRMATION REQUIRED 🚨")
-    logger.warning("You are about to start LIVE TRADING with REAL MONEY!")
-    logger.warning("This will place REAL ORDERS on Binance USDM Futures!")
-    
-    print()
-    print("Type 'I UNDERSTAND THE RISKS' to continue:")
-    confirmation = input("> ").strip()
-    
-    if confirmation != "I UNDERSTAND THE RISKS":
-        logger.info("❌ Live trading cancelled by user")
-        return False
-        
-    print()
-    print("Type 'START LIVE TRADING' to begin:")
-    final_confirm = input("> ").strip()
-    
-    if final_confirm != "START LIVE TRADING":
-        logger.info("❌ Live trading cancelled by user")
-        return False
-        
-    logger.info("✅ Live trading confirmed by user")
+    logger.warning("🚨 LIVE TRADING MODE - REAL MONEY! 🚨")
+    logger.info("✅ Starting live trading system...")
     return True
 
 def main():

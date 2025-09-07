@@ -31,6 +31,7 @@ class Position:
     is_open: bool = True
     peak_R: float = 0.0
     realized_pnl: float = 0.0
+    peak_pnl_usdt: float = 0.0  # Track maximum PnL for trailing
     bars_open: int = 0
     entry_reason: str = "breakout"
     sl_initial: float = 0.0    # исходный SL (для логики TRAIL vs SL_INIT)

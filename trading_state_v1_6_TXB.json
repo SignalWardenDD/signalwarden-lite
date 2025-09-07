@@ -2,13 +2,3008 @@
   "metadata": {
     "version": "v1.6-TXB",
     "created": "2025-09-06T22:37:56.323066",
-    "last_updated": "2025-09-06T22:37:56.323073"
+    "last_updated": "2025-09-07T14:58:19.102434"
   },
-  "symbols": {},
-  "signals_history": [],
+  "symbols": {
+    "ADA_USDT": {
+      "active_position": {
+        "symbol": "ADA_USDT",
+        "side": "LONG",
+        "entry": 0.8372542857142857,
+        "qty": 25.081985674261787,
+        "sl_initial": 0.8259685714285715,
+        "sl_current": 0.8259685714285715,
+        "atr": 0.004514285714285701,
+        "timestamp": 1757256096.36846,
+        "order_id": "57918791901",
+        "sl_order_id": "57918791922",
+        "trailing_active": false,
+        "peak_pnl_usdt": 0.0
+      },
+      "last_signal_time": 1757256096.3684638
+    },
+    "LTC_USDT": {
+      "active_position": null
+    },
+    "PNUT_USDT": {
+      "active_position": {
+        "symbol": "PNUT_USDT",
+        "side": "LONG",
+        "entry": 0.21559114285714287,
+        "qty": 97.4065989988987,
+        "sl_initial": 0.21049828571428572,
+        "sl_current": 0.21049828571428572,
+        "atr": 0.0020371428571428585,
+        "timestamp": 1757241459.631868,
+        "order_id": "8918193408",
+        "sl_order_id": "8918193464",
+        "trailing_active": false
+      },
+      "last_signal_time": 1757241459.6318731
+    },
+    "WIF_USDT": {
+      "active_position": {
+        "symbol": "WIF_USDT",
+        "side": "LONG",
+        "entry": 0.8303964285714286,
+        "qty": 25.28912610586166,
+        "sl_initial": 0.8145928571428571,
+        "sl_current": 0.8145928571428571,
+        "atr": 0.006321428571428573,
+        "timestamp": 1757244464.972318,
+        "order_id": "20401018388",
+        "sl_order_id": "20401018444",
+        "trailing_active": false
+      },
+      "last_signal_time": 1757244464.9723232
+    },
+    "DOGE_USDT": {
+      "active_position": {
+        "symbol": "DOGE_USDT",
+        "side": "LONG",
+        "entry": 0.2198587857142857,
+        "qty": 95.51585546956603,
+        "sl_initial": 0.2162855714285714,
+        "sl_current": 0.2162855714285714,
+        "atr": 0.0014292857142857163,
+        "timestamp": 1757256348.544966,
+        "order_id": "81139729661",
+        "sl_order_id": "81139731794",
+        "trailing_active": false,
+        "peak_pnl_usdt": 0.0
+      },
+      "last_signal_time": 1757256348.544972
+    }
+  },
+  "signals_history": [
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757209534,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 112.64985714285714,
+        "reason": "breakout",
+        "atr": 0.5328571428571414,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 112.649857, SL @ 111.850571, Qty: 0.665780",
+      "datetime": "2025-09-07T04:45:34"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757209659,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 112.65092857142857,
+        "reason": "breakout",
+        "atr": 0.5364285714285698,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 112.650929, SL @ 111.846286, Qty: 0.665773",
+      "datetime": "2025-09-07T04:47:39"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757209785,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 112.65178571428571,
+        "reason": "breakout",
+        "atr": 0.539285714285713,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T04:49:45"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757209910,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 112.65328571428572,
+        "reason": "breakout",
+        "atr": 0.5442857142857126,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T04:51:50"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757210035,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 112.65328571428572,
+        "reason": "breakout",
+        "atr": 0.5442857142857126,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T04:53:55"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757210038,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8257878571428572,
+        "reason": "breakout",
+        "atr": 0.007292857142857141,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T04:53:58"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757210161,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 112.65328571428572,
+        "reason": "breakout",
+        "atr": 0.5442857142857126,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T04:56:01"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757210164,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8257878571428572,
+        "reason": "breakout",
+        "atr": 0.007292857142857141,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T04:56:04"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757210286,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 112.65328571428572,
+        "reason": "breakout",
+        "atr": 0.5442857142857126,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T04:58:06"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757210289,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8257878571428572,
+        "reason": "breakout",
+        "atr": 0.007292857142857141,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T04:58:09"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757224416,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.2287857142857,
+        "reason": "breakout",
+        "atr": 0.529285714285712,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T08:53:36"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757224419,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8283192857142858,
+        "reason": "breakout",
+        "atr": 0.007064285714285713,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T08:53:39"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757224420,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21496335714285714,
+        "reason": "breakout",
+        "atr": 0.002177857142857146,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T08:53:40"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757224542,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.22964285714285,
+        "reason": "breakout",
+        "atr": 0.5321428571428554,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T08:55:42"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757224545,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8283192857142858,
+        "reason": "breakout",
+        "atr": 0.007064285714285713,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T08:55:45"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757224546,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21496335714285714,
+        "reason": "breakout",
+        "atr": 0.002177857142857146,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-2019,\"msg\":\"Margin is insufficient.\"}",
+      "datetime": "2025-09-07T08:55:46"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757230623,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.86792857142856,
+        "reason": "breakout",
+        "atr": 0.5264285714285687,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:37:03"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757230748,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.869,
+        "reason": "breakout",
+        "atr": 0.529999999999997,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:39:08"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757230873,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.86921428571428,
+        "reason": "breakout",
+        "atr": 0.5307142857142831,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:41:13"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757230999,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.87007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714255,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:43:19"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757231124,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.87007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714255,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:45:24"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757231249,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.87007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714255,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:47:29"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757231374,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.87007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714255,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:49:34"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757231500,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.87007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714255,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:51:40"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757231625,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.87007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714255,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:53:45"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757231750,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.87007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714255,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:55:50"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757231876,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.87007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714255,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T10:57:56"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757232002,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 113.87007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714255,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T11:00:02"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757233877,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 0.830371, SL @ 0.824017, Qty: 18.064221",
+      "datetime": "2025-09-07T11:31:17"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234002,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:33:22"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234127,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:35:27"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234254,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:37:34"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234381,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:39:41"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234509,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:41:49"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234635,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:43:55"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234759,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:45:59"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234794,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:46:34"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234884,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:48:04"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757234919,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:48:39"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235010,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:50:10"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235044,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:50:44"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235135,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:52:15"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235170,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:52:50"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235183,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:53:03"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235260,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:54:20"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235295,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:54:55"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235308,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:55:08"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235385,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:56:25"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235420,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:57:00"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235433,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:57:13"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235510,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:58:30"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235545,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:59:05"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757235559,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303707142857142,
+        "reason": "breakout",
+        "atr": 0.004235714285714295,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T11:59:19"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757239335,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.31364285714285,
+        "reason": "breakout",
+        "atr": 0.5121428571428542,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T13:02:15"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757239461,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.31471428571429,
+        "reason": "breakout",
+        "atr": 0.5157142857142836,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T13:04:21"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757239587,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.31621428571428,
+        "reason": "breakout",
+        "atr": 0.5207142857142831,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Execution failed: binanceusdm {\"code\":-4164,\"msg\":\"Order's notional must be no smaller than 20 (unless you choose reduce only).\"}",
+      "datetime": "2025-09-07T13:06:27"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757239700,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.31664285714285,
+        "reason": "breakout",
+        "atr": 0.5221428571428542,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 114.316643, SL @ 113.011286, Qty: 0.183700",
+      "datetime": "2025-09-07T13:08:20"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757239825,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.31685714285715,
+        "reason": "breakout",
+        "atr": 0.5228571428571404,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:10:25"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757239951,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.31685714285715,
+        "reason": "breakout",
+        "atr": 0.5228571428571404,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:12:31"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757240076,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.31685714285715,
+        "reason": "breakout",
+        "atr": 0.5228571428571404,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:14:36"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757240202,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.31857142857143,
+        "reason": "breakout",
+        "atr": 0.5285714285714259,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:16:42"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757240327,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.31857142857143,
+        "reason": "breakout",
+        "atr": 0.5285714285714259,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:18:47"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757240452,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32007142857142,
+        "reason": "breakout",
+        "atr": 0.5335714285714265,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:20:52"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757240577,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32264285714285,
+        "reason": "breakout",
+        "atr": 0.5421428571428544,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:22:57"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757240702,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:25:02"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757240827,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:27:07"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757240952,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:29:12"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757241078,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:31:18"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757241204,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:33:24"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757241330,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:35:30"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757241455,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:37:35"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757241459,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21559114285714287,
+        "reason": "breakout",
+        "atr": 0.0020371428571428585,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 0.215591, SL @ 0.210498, Qty: 97.406599",
+      "datetime": "2025-09-07T13:37:39"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757241581,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:39:41"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757241584,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21559114285714287,
+        "reason": "breakout",
+        "atr": 0.0020371428571428585,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:39:44"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757241706,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:41:46"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757241710,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2155922142857143,
+        "reason": "breakout",
+        "atr": 0.0020407142857142868,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:41:50"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757241831,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:43:51"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757241835,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2155922142857143,
+        "reason": "breakout",
+        "atr": 0.0020407142857142868,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:43:55"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757241957,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:45:57"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757241960,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2155922142857143,
+        "reason": "breakout",
+        "atr": 0.0020407142857142868,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:46:00"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757242082,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:48:02"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757242085,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2155922142857143,
+        "reason": "breakout",
+        "atr": 0.0020407142857142868,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:48:05"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757242207,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:50:07"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757242211,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2155922142857143,
+        "reason": "breakout",
+        "atr": 0.0020407142857142868,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:50:11"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757242332,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:52:12"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757242336,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2155982142857143,
+        "reason": "breakout",
+        "atr": 0.002060714285714287,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:52:16"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757242457,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:54:17"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757242461,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2155982142857143,
+        "reason": "breakout",
+        "atr": 0.002060714285714287,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:54:21"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757242583,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:56:23"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757242586,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2155982142857143,
+        "reason": "breakout",
+        "atr": 0.002060714285714287,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:56:26"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757242708,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.32435714285714,
+        "reason": "breakout",
+        "atr": 0.5478571428571399,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T13:58:28"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757242712,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2155982142857143,
+        "reason": "breakout",
+        "atr": 0.002060714285714287,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T13:58:32"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757244464,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8303964285714286,
+        "reason": "breakout",
+        "atr": 0.006321428571428573,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 0.830396, SL @ 0.814593, Qty: 25.289126",
+      "datetime": "2025-09-07T14:27:44"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757244590,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8304092857142857,
+        "reason": "breakout",
+        "atr": 0.006364285714285719,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:29:50"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757244715,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8304157142857143,
+        "reason": "breakout",
+        "atr": 0.006385714285714288,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:31:55"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757244840,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8304392857142857,
+        "reason": "breakout",
+        "atr": 0.006464285714285716,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:34:00"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757244966,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8304392857142857,
+        "reason": "breakout",
+        "atr": 0.006464285714285716,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:36:06"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757245091,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8304392857142857,
+        "reason": "breakout",
+        "atr": 0.006464285714285716,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:38:11"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757245215,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21850507142857145,
+        "reason": "breakout",
+        "atr": 0.0011835714285714307,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 0.218505, SL @ 0.215546, Qty: 96.107609",
+      "datetime": "2025-09-07T14:40:15"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757245217,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8304392857142857,
+        "reason": "breakout",
+        "atr": 0.006464285714285716,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:40:17"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757245340,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21851664285714287,
+        "reason": "breakout",
+        "atr": 0.001222142857142858,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T14:42:20"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757245342,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8304521428571429,
+        "reason": "breakout",
+        "atr": 0.006507142857142862,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:42:22"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757245465,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21851664285714287,
+        "reason": "breakout",
+        "atr": 0.001222142857142858,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T14:44:25"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757245467,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8305335714285714,
+        "reason": "breakout",
+        "atr": 0.006778571428571435,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:44:27"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757245468,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2166927857142857,
+        "reason": "breakout",
+        "atr": 0.0020092857142857174,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T14:44:28"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757245590,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21851664285714287,
+        "reason": "breakout",
+        "atr": 0.001222142857142858,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T14:46:30"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757245592,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8305442857142857,
+        "reason": "breakout",
+        "atr": 0.006814285714285717,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:46:32"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757245593,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2166927857142857,
+        "reason": "breakout",
+        "atr": 0.0020092857142857174,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T14:46:33"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757245715,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21851664285714287,
+        "reason": "breakout",
+        "atr": 0.001222142857142858,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T14:48:35"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757245718,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8305442857142857,
+        "reason": "breakout",
+        "atr": 0.006814285714285717,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:48:38"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757245718,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2166927857142857,
+        "reason": "breakout",
+        "atr": 0.0020092857142857174,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T14:48:38"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757245839,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8318764285714285,
+        "reason": "breakout",
+        "atr": 0.003921428571428576,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T14:50:39"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757245840,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21851664285714287,
+        "reason": "breakout",
+        "atr": 0.001222142857142858,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T14:50:40"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757245843,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8305442857142857,
+        "reason": "breakout",
+        "atr": 0.006814285714285717,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:50:43"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757245843,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2166927857142857,
+        "reason": "breakout",
+        "atr": 0.0020092857142857174,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T14:50:43"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757245964,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.831885,
+        "reason": "breakout",
+        "atr": 0.003950000000000001,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T14:52:44"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757245966,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21851664285714287,
+        "reason": "breakout",
+        "atr": 0.001222142857142858,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T14:52:46"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757245968,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8305442857142857,
+        "reason": "breakout",
+        "atr": 0.006814285714285717,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:52:48"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757245969,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2166927857142857,
+        "reason": "breakout",
+        "atr": 0.0020092857142857174,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T14:52:49"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757246090,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8318892857142857,
+        "reason": "breakout",
+        "atr": 0.003964285714285714,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T14:54:50"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757246091,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21851664285714287,
+        "reason": "breakout",
+        "atr": 0.001222142857142858,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T14:54:51"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757246093,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8305442857142857,
+        "reason": "breakout",
+        "atr": 0.006814285714285717,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:54:53"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757246094,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2166927857142857,
+        "reason": "breakout",
+        "atr": 0.0020092857142857174,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T14:54:54"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757246215,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8318935714285715,
+        "reason": "breakout",
+        "atr": 0.003978571428571427,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T14:56:55"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757246216,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21851664285714287,
+        "reason": "breakout",
+        "atr": 0.001222142857142858,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T14:56:56"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757246218,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8305442857142857,
+        "reason": "breakout",
+        "atr": 0.006814285714285717,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:56:58"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757246219,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2166927857142857,
+        "reason": "breakout",
+        "atr": 0.0020092857142857174,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T14:56:59"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757246340,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8318935714285715,
+        "reason": "breakout",
+        "atr": 0.003978571428571427,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T14:59:00"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757246341,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21851664285714287,
+        "reason": "breakout",
+        "atr": 0.001222142857142858,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T14:59:01"
+    },
+    {
+      "symbol": "WIF_USDT",
+      "timestamp": 1757246343,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8305442857142857,
+        "reason": "breakout",
+        "atr": 0.006814285714285717,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "WIF_USDT"
+      },
+      "result": "\u274c Position already open for WIF_USDT - skipping",
+      "datetime": "2025-09-07T14:59:03"
+    },
+    {
+      "symbol": "PNUT_USDT",
+      "timestamp": 1757246344,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2166927857142857,
+        "reason": "breakout",
+        "atr": 0.0020092857142857174,
+        "regime": "calm",
+        "confidence": "HIGH",
+        "symbol": "PNUT_USDT"
+      },
+      "result": "\u274c Position already open for PNUT_USDT - skipping",
+      "datetime": "2025-09-07T14:59:04"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757248173,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8341978571428571,
+        "reason": "breakout",
+        "atr": 0.003992857142857139,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 0.834198, SL @ 0.824216, Qty: 25.173884",
+      "datetime": "2025-09-07T15:29:33"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757248298,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8342321428571429,
+        "reason": "breakout",
+        "atr": 0.004107142857142849,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T15:31:38"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757248674,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.50814285714286,
+        "reason": "breakout",
+        "atr": 0.5271428571428548,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:37:54"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757248800,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.50835714285714,
+        "reason": "breakout",
+        "atr": 0.5278571428571398,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:40:00"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757248925,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.50835714285714,
+        "reason": "breakout",
+        "atr": 0.5278571428571398,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:42:05"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757249050,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.50835714285714,
+        "reason": "breakout",
+        "atr": 0.5278571428571398,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:44:10"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757249175,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.50835714285714,
+        "reason": "breakout",
+        "atr": 0.5278571428571398,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:46:15"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757249300,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.50921428571428,
+        "reason": "breakout",
+        "atr": 0.5307142857142831,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:48:20"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757249425,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.51114285714286,
+        "reason": "breakout",
+        "atr": 0.5371428571428548,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:50:25"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757249550,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.51242857142857,
+        "reason": "breakout",
+        "atr": 0.5414285714285693,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:52:30"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757249675,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.5135,
+        "reason": "breakout",
+        "atr": 0.5449999999999976,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:54:35"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757249800,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.5135,
+        "reason": "breakout",
+        "atr": 0.5449999999999976,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:56:40"
+    },
+    {
+      "symbol": "LTC_USDT",
+      "timestamp": 1757249925,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 114.5135,
+        "reason": "breakout",
+        "atr": 0.5449999999999976,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "LTC_USDT"
+      },
+      "result": "\u274c Position already open for LTC_USDT - skipping",
+      "datetime": "2025-09-07T15:58:45"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757254247,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21977157142857143,
+        "reason": "breakout",
+        "atr": 0.0011385714285714293,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 0.219772, SL @ 0.216925, Qty: 95.553760",
+      "datetime": "2025-09-07T17:10:47"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757254373,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:12:53"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757254498,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:14:58"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757254622,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:17:02"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757254748,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:19:08"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757254873,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 0.219821, SL @ 0.216564, Qty: 95.532336",
+      "datetime": "2025-09-07T17:21:13"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757254998,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:23:18"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757255124,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:25:24"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757255249,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:27:29"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757255374,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:29:34"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757255499,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982085714285712,
+        "reason": "breakout",
+        "atr": 0.0013028571428571434,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:31:39"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757255625,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21982171428571426,
+        "reason": "breakout",
+        "atr": 0.001305714285714287,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:33:45"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757255750,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.21984914285714285,
+        "reason": "breakout",
+        "atr": 0.0013971428571428587,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:35:50"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757255875,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198510714285714,
+        "reason": "breakout",
+        "atr": 0.0014035714285714307,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:37:55"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757256000,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:40:00"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757256096,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8372542857142857,
+        "reason": "breakout",
+        "atr": 0.004514285714285701,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 0.837254, SL @ 0.825969, Qty: 25.081986",
+      "datetime": "2025-09-07T17:41:36"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757256097,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:41:37"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757256222,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:43:42"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757256346,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8372542857142857,
+        "reason": "breakout",
+        "atr": 0.004514285714285701,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T17:45:46"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757256348,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u2705 LONG breakout @ 0.219859, SL @ 0.216286, Qty: 95.515855",
+      "datetime": "2025-09-07T17:45:48"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757256472,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8372542857142857,
+        "reason": "breakout",
+        "atr": 0.004514285714285701,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T17:47:52"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757256473,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:47:53"
+    },
+    {
+      "symbol": "ADA_USDT",
+      "timestamp": 1757256597,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.8372542857142857,
+        "reason": "breakout",
+        "atr": 0.004514285714285701,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "ADA_USDT"
+      },
+      "result": "\u274c Position already open for ADA_USDT - skipping",
+      "datetime": "2025-09-07T17:49:57"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757256598,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:49:58"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757256723,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:52:03"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757256849,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:54:09"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757256974,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:56:14"
+    },
+    {
+      "symbol": "DOGE_USDT",
+      "timestamp": 1757257099,
+      "signal": {
+        "timeframe": "1h",
+        "side": "LONG",
+        "setup": "breakout",
+        "entry": 0.2198587857142857,
+        "reason": "breakout",
+        "atr": 0.0014292857142857163,
+        "regime": "ultra_calm",
+        "confidence": "HIGH",
+        "symbol": "DOGE_USDT"
+      },
+      "result": "\u274c Position already open for DOGE_USDT - skipping",
+      "datetime": "2025-09-07T17:58:19"
+    }
+  ],
   "performance": {
-    "total_signals": 0,
-    "total_trades": 0,
+    "total_signals": 172,
+    "total_trades": 12,
     "session_start": "2025-09-06T22:37:56.323074"
   }
 }
