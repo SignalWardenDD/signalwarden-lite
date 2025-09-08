@@ -149,6 +149,7 @@ class SignalWardenLive:
         self.margin_usdt = self.cfg['risk']['margin_usdt']  # 21 USDT notional per trade
         self.leverage = self.cfg['risk']['leverage']  # 5x leverage
         self.sl_atr_mult = self.cfg['risk']['sl_atr_mult']  # 1.5x ATR for SL
+        self.sl_order_type = self.cfg['risk'].get('sl_order_type', 'stop_market')  # Default to market stop loss
         
         # Active positions tracking (1 position per symbol max)
         self.active_positions = {}  # symbol -> position_info
@@ -161,6 +162,7 @@ class SignalWardenLive:
         self.trailing_stop_event = threading.Event()
         
         logger.info(f"⚙️ Risk per trade: {self.margin_usdt} USDT notional ({self.margin_usdt/self.leverage:.1f} USDT actual margin)")
+        logger.info(f"🛡️ Stop-loss type: {self.sl_order_type} ({'маркет стоп-лосс (рыночный)' if self.sl_order_type == 'stop_market' else 'лимитный стоп-лосс'})")
         
     def sync_positions_from_exchange(self):
         """Sync positions from Binance exchange"""
@@ -244,7 +246,7 @@ class SignalWardenLive:
                     'order_id': None,
                     'trailing_active': False,
                     'unrealized_pnl': float(pos['unrealizedPnl']),
-                    'peak_pnl_usdt': 0.0,  # Track maximum PnL for trailing
+                    'peak_pnl_usdt': max(0.0, float(pos['unrealizedPnl'])),  # Initialize with current PnL
                     'synced_from_exchange': True
                 }
                 
@@ -430,6 +432,9 @@ class SignalWardenLive:
                         # Save updated peak PnL
                         pos['peak_pnl_usdt'] = updated_pos.peak_pnl_usdt
                         
+                        # Save position state to persistent storage
+                        self.save_position_state(symbol, pos)
+                        
                         # Update sliding market stop loss on exchange
                         self.update_sliding_stop_loss(symbol, pos)
                         
@@ -474,6 +479,8 @@ class SignalWardenLive:
                         logger.info(f"📊 {symbol}: Position already closed on exchange")
                         # Remove from tracking
                         del self.active_positions[symbol]
+                        # Clean up saved position state
+                        self.cleanup_position_state(symbol)
                         self.storage.update_symbol(symbol, {'active_position': None})
                         return
                 except Exception as pos_check_error:
@@ -500,6 +507,9 @@ class SignalWardenLive:
             
             # Remove from tracking
             del self.active_positions[symbol]
+            
+            # Clean up saved position state
+            self.cleanup_position_state(symbol)
             
             # Update storage
             self.storage.update_symbol(symbol, {
@@ -585,6 +595,8 @@ class SignalWardenLive:
         for symbol in positions_to_close:
             if symbol in self.active_positions:
                 del self.active_positions[symbol]
+                # Clean up saved position state
+                self.cleanup_position_state(symbol)
                 self.storage.update_symbol(symbol, {'active_position': None})
     
     def update_sliding_stop_loss(self, symbol: str, pos: Dict[str, Any]):
@@ -617,9 +629,9 @@ class SignalWardenLive:
             try:
                 open_orders = self.exchange.fetch_open_orders(ccxt_sym)
                 for order in open_orders:
-                    if order['type'] == 'stop_market' and order['info'].get('reduceOnly'):
+                    if order['type'] in ['stop_market', 'stop'] and order['info'].get('reduceOnly'):
                         old_sl_orders.append(order)
-                        logger.debug(f"📊 {symbol}: Found existing SL order {order['id']} @ {order['stopPrice']}")
+                        logger.debug(f"📊 {symbol}: Found existing SL order {order['id']} @ {order.get('stopPrice', order.get('price'))}")
             except Exception as orders_error:
                 logger.warning(f"⚠️ Could not fetch open orders for {symbol}: {orders_error}")
             
@@ -635,18 +647,35 @@ class SignalWardenLive:
             max_retries = 3
             for attempt in range(max_retries):
                 try:
-                    new_sl_order = self.exchange.create_order(
-                        ccxt_sym,
-                        'stop_market',
-                        sl_side,
-                        pos['qty'],
-                        None,
-                        params={
-                            'stopPrice': pos['sl_current'],
-                            'reduceOnly': True,
-                            'timeInForce': 'GTC'
-                        }
-                    )
+                    # Determine order parameters based on type
+                    if self.sl_order_type == 'stop_market':
+                        # Маркет стоп-лосс (рыночный ордер после триггера) - по умолчанию
+                        new_sl_order = self.exchange.create_order(
+                            ccxt_sym,
+                            'stop_market',
+                            sl_side,
+                            pos['qty'],
+                            None,  # Нет цены исполнения для stop_market
+                            params={
+                                'stopPrice': pos['sl_current'],
+                                'reduceOnly': True,
+                                'timeInForce': 'GTC'
+                            }
+                        )
+                    else:
+                        # Лимитный стоп-лосс (лимитный ордер после триггера)
+                        new_sl_order = self.exchange.create_order(
+                            ccxt_sym,
+                            'stop',
+                            sl_side,
+                            pos['qty'],
+                            pos['sl_current'],  # Цена исполнения для лимитного стопа
+                            params={
+                                'stopPrice': pos['sl_current'],
+                                'reduceOnly': True,
+                                'timeInForce': 'GTC'
+                            }
+                        )
                     new_sl_created = True
                     logger.info(f"✅ {symbol}: New SL order created @ {pos['sl_current']:.6f} (ID: {new_sl_order['id']})")
                     break
@@ -939,18 +968,35 @@ class SignalWardenLive:
             # Create initial stop loss order immediately
             sl_side = 'sell' if side == 'LONG' else 'buy'
             try:
-                sl_order = self.exchange.create_order(
-                    ccxt_sym,
-                    'stop_market',
-                    sl_side,
-                    qty,
-                    None,
-                    params={
-                        'stopPrice': sl_price,
-                        'reduceOnly': True,
-                        'timeInForce': 'GTC'
-                    }
-                )
+                # Determine order parameters based on type
+                if self.sl_order_type == 'stop_market':
+                    # Маркет стоп-лосс (рыночный ордер после триггера) - по умолчанию
+                    sl_order = self.exchange.create_order(
+                        ccxt_sym,
+                        'stop_market',
+                        sl_side,
+                        qty,
+                        None,  # Нет цены исполнения для stop_market
+                        params={
+                            'stopPrice': sl_price,
+                            'reduceOnly': True,
+                            'timeInForce': 'GTC'
+                        }
+                    )
+                else:
+                    # Лимитный стоп-лосс (лимитный ордер после триггера)
+                    sl_order = self.exchange.create_order(
+                        ccxt_sym,
+                        'stop',
+                        sl_side,
+                        qty,
+                        sl_price,  # Цена исполнения для лимитного стопа
+                        params={
+                            'stopPrice': sl_price,
+                            'reduceOnly': True,
+                            'timeInForce': 'GTC'
+                        }
+                    )
                 sl_order_id = sl_order['id']
                 logger.info(f"🛡️ {symbol}: Stop-loss created @ {sl_price:.6f} (Order ID: {sl_order_id})")
             except Exception as e:
@@ -1072,6 +1118,9 @@ class SignalWardenLive:
         logger.info(f"🛡️ Adaptive shorts with BTC filter enabled")
         logger.info(f"🔄 PnL-based trailing: 0.10 USDT activation, 50%/60%/70%/80% levels")
         
+        # Load saved position states
+        self.load_position_states()
+        
         # Start fast trailing thread
         self.start_trailing_thread()
         
@@ -1102,6 +1151,62 @@ class SignalWardenLive:
             logger.info("🛑 Shutdown complete")
             
         logger.info(f"📊 Total cycles completed: {cycle_count}")
+    
+    def save_position_state(self, symbol: str, pos: dict):
+        """Save position state to persistent storage"""
+        try:
+            position_state = {
+                'symbol': symbol,
+                'side': pos['side'],
+                'entry': pos['entry'],
+                'qty': pos['qty'],
+                'sl_current': pos['sl_current'],
+                'sl_initial': pos['sl_initial'],
+                'peak_pnl_usdt': pos['peak_pnl_usdt'],
+                'trailing_active': pos['trailing_active'],
+                'timestamp': time.time()
+            }
+            
+            # Save to storage
+            self.storage.update_symbol(f"{symbol}_position", position_state)
+            
+        except Exception as e:
+            logger.error(f"❌ Error saving position state for {symbol}: {e}")
+    
+    def load_position_states(self):
+        """Load saved position states from persistent storage"""
+        try:
+            for symbol in self.cfg['symbols']:
+                ccxt_symbol = symbol.replace('_', '/')
+                
+                # Skip if position already exists in memory
+                if symbol in self.active_positions:
+                    # Load saved peak_pnl_usdt if available
+                    saved_state = self.storage.get_symbol(f"{symbol}_position")
+                    if saved_state and 'peak_pnl_usdt' in saved_state:
+                        self.active_positions[symbol]['peak_pnl_usdt'] = max(
+                            self.active_positions[symbol]['peak_pnl_usdt'],
+                            saved_state['peak_pnl_usdt']
+                        )
+                        logger.info(f"🔄 {symbol}: Restored peak PnL {saved_state['peak_pnl_usdt']:.3f} USDT")
+                    continue
+                    
+        except Exception as e:
+            logger.error(f"❌ Error loading position states: {e}")
+    
+    def cleanup_position_state(self, symbol: str):
+        """Clean up saved position state when position is closed"""
+        try:
+            # Remove from storage
+            db = self.storage.read()
+            position_key = f"{symbol}_position"
+            if 'symbols' in db and position_key in db['symbols']:
+                del db['symbols'][position_key]
+                self.storage.write(db)
+                logger.debug(f"🧹 Cleaned up saved state for {symbol}")
+                
+        except Exception as e:
+            logger.error(f"❌ Error cleaning up position state for {symbol}: {e}")
 
 def main():
     parser = argparse.ArgumentParser(description='SignalWarden Lite v1.6-TXB Live Trading')

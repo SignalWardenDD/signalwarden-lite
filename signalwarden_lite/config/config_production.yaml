@@ -17,6 +17,7 @@ risk:
   margin_usdt: 21        # $21 notional per trade (4.2 USDT actual margin with 5x leverage)
   leverage: 5            # 5x leverage = $125 notional  
   sl_atr_mult: 2.5       # Stop loss at 2.5x ATR (safer distance)
+  sl_order_type: stop_market    # 'stop_market' = маркет стоп-лосс (по умолчанию), 'stop' = лимитный стоп-лосс
   cutloss_early: 
     enabled: false       # Disabled for v1.6-TXB (trailing-only)
 
