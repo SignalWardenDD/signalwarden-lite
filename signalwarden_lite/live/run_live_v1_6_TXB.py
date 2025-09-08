@@ -407,50 +407,58 @@ class SignalWardenLive:
                     self.trailing
                 )
                 
-                # Check if SL hit
+                # CRITICAL: Only improve SL, never degrade it
+                should_update = False
+                if pos['side'] == 'LONG' and updated_pos.sl > pos['sl_current']:
+                    should_update = True  # SL moves up for longs
+                elif pos['side'] == 'SHORT' and updated_pos.sl < pos['sl_current']:
+                    should_update = True  # SL moves down for shorts
+                    
+                if should_update:
+                    old_sl = pos['sl_current']
+                    pos['sl_current'] = updated_pos.sl
+                    pos['trailing_active'] = True
+                    
+                    # Save updated peak PnL
+                    pos['peak_pnl_usdt'] = updated_pos.peak_pnl_usdt
+                    
+                    # Save position state to persistent storage
+                    self.save_position_state(symbol, pos)
+                    
+                    # Update sliding market stop loss on exchange
+                    self.update_sliding_stop_loss(symbol, pos)
+                    
+                    # Log trailing update with detailed debug info
+                    direction = "🟢" if pos['side'] == 'LONG' else "🔴"
+                    
+                    # Get debug info from trailing function
+                    debug_info = getattr(updated_pos, 'trailing_debug', {})
+                    level_info = f" ({debug_info.get('level', 'L?')}: {debug_info.get('keep_pct', 0)*100:.0f}%)"
+                    
+                    logger.info(f"{direction} {symbol}: Trailing SL {old_sl:.6f} → {updated_pos.sl:.6f}, PnL: {real_pnl:.2f} USDT{level_info}")
+                    
+                    # Additional debug logging
+                    if debug_info:
+                        logger.debug(f"📊 {symbol} Trailing Debug: Peak={debug_info.get('peak_pnl', 0):.2f}, Target={debug_info.get('target_profit', 0):.2f}, Updated={debug_info.get('sl_updated', False)}")
+                else:
+                    # Always save peak PnL even if SL doesn't update
+                    if updated_pos.peak_pnl_usdt > pos.get('peak_pnl_usdt', 0.0):
+                        pos['peak_pnl_usdt'] = updated_pos.peak_pnl_usdt
+                        self.save_position_state(symbol, pos)
+                        
+                        # Log peak PnL update
+                        logger.debug(f"📊 {symbol}: Peak PnL updated to ${updated_pos.peak_pnl_usdt:.3f} (SL unchanged)")
+                
+                # Check if current SL hit (use CURRENT sl_current, not updated_pos.sl)
                 sl_hit = False
-                if pos['side'] == 'LONG' and current_price <= updated_pos.sl:
+                if pos['side'] == 'LONG' and current_price <= pos['sl_current']:
                     sl_hit = True
-                elif pos['side'] == 'SHORT' and current_price >= updated_pos.sl:
+                elif pos['side'] == 'SHORT' and current_price >= pos['sl_current']:
                     sl_hit = True
                     
                 if sl_hit:
+                    logger.info(f"🚨 {symbol}: SL hit at {current_price:.6f}, closing position")
                     self.close_position(symbol, current_price, "Trailing SL Hit")
-                else:
-                    # CRITICAL: Only improve SL, never degrade it
-                    should_update = False
-                    if pos['side'] == 'LONG' and updated_pos.sl > pos['sl_current']:
-                        should_update = True  # SL moves up for longs
-                    elif pos['side'] == 'SHORT' and updated_pos.sl < pos['sl_current']:
-                        should_update = True  # SL moves down for shorts
-                        
-                    if should_update:
-                        old_sl = pos['sl_current']
-                        pos['sl_current'] = updated_pos.sl
-                        pos['trailing_active'] = True
-                        
-                        # Save updated peak PnL
-                        pos['peak_pnl_usdt'] = updated_pos.peak_pnl_usdt
-                        
-                        # Save position state to persistent storage
-                        self.save_position_state(symbol, pos)
-                        
-                        # Update sliding market stop loss on exchange
-                        self.update_sliding_stop_loss(symbol, pos)
-                        
-                        # Log trailing update with detailed debug info
-                        direction = "🟢" if pos['side'] == 'LONG' else "🔴"
-                        
-                        # Get debug info from trailing function
-                        debug_info = getattr(updated_pos, 'trailing_debug', {})
-                        level_info = f" ({debug_info.get('level', 'L?')}: {debug_info.get('keep_pct', 0)*100:.0f}%)"
-                        
-                        logger.info(f"{direction} {symbol}: Trailing SL {old_sl:.6f} → {updated_pos.sl:.6f}, PnL: {real_pnl:.2f} USDT{level_info}")
-                        
-                        # Additional debug logging
-                        if debug_info:
-                            logger.debug(f"📊 {symbol} Trailing Debug: Peak={debug_info.get('peak_pnl', 0):.2f}, Target={debug_info.get('target_profit', 0):.2f}, Updated={debug_info.get('sl_updated', False)}")
-                        
             except Exception as e:
                 logger.error(f"❌ Trailing update failed for {symbol}: {e}")
                 
