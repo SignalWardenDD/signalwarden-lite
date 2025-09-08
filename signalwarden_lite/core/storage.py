@@ -32,6 +32,13 @@ class JSONStore:
     
     def write(self, data: Dict[str, Any]):
         """Write entire storage atomically"""
+        # Ensure metadata exists
+        if 'metadata' not in data:
+            data['metadata'] = {
+                'version': 'v1.6-TXB',
+                'created': datetime.utcnow().isoformat()
+            }
+        
         data['metadata']['last_updated'] = datetime.utcnow().isoformat()
         tmp_path = self.path + '.tmp'
         with open(tmp_path, 'w') as f:

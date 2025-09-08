@@ -798,6 +798,10 @@ class SignalWardenLive:
         except Exception as e:
             logger.error(f"❌ Failed to fetch {symbol} {timeframe}: {e}")
             return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+    
+    def fetch_recent_data(self, symbol: str, timeframe: str = '1h', limit: int = 600) -> pd.DataFrame:
+        """Fetch recent OHLCV data from exchange (compatible with old API)"""
+        return self.fetch_ohlcv(symbol, timeframe, limit)
             
     def get_btc_market_bias(self) -> Optional[pd.DataFrame]:
         """Get BTC market filter with caching"""
