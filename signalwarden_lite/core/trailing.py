@@ -77,9 +77,13 @@ def update_trailing_pnl_based(pos: Position, current_price: float, current_pnl_u
         if quantity > 0:
             new_sl = pos.entry + (target_profit_usdt / quantity)
             # Никогда не ухудшаем SL для лонгов (только увеличиваем)
-            if new_sl > pos.sl:
+            # ВАЖНО: используем небольшую толерантность для числовых ошибок
+            if new_sl > pos.sl + 1e-8:  # Добавляем минимальную толерантность
                 pos.sl = new_sl
                 pos.trailing_debug['sl_updated'] = True
+            else:
+                pos.trailing_debug['sl_updated'] = False
+                pos.trailing_debug['reason'] = f'new_sl {new_sl:.8f} <= current_sl {pos.sl:.8f}'
                 
     else:  # SHORT
         # Для шортов: entry - target_profit_usdt / qty
@@ -87,9 +91,13 @@ def update_trailing_pnl_based(pos: Position, current_price: float, current_pnl_u
         if quantity > 0:
             new_sl = pos.entry - (target_profit_usdt / quantity)
             # Никогда не ухудшаем SL для шортов (только уменьшаем)
-            if new_sl < pos.sl:
+            # ВАЖНО: используем небольшую толерантность для числовых ошибок
+            if new_sl < pos.sl - 1e-8:  # Добавляем минимальную толерантность
                 pos.sl = new_sl
                 pos.trailing_debug['sl_updated'] = True
+            else:
+                pos.trailing_debug['sl_updated'] = False
+                pos.trailing_debug['reason'] = f'new_sl {new_sl:.8f} >= current_sl {pos.sl:.8f}'
     
     # Обновляем отладочную информацию
     pos.trailing_debug.update({

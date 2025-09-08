@@ -408,11 +408,40 @@ class SignalWardenLive:
                 )
                 
                 # CRITICAL: Only improve SL, never degrade it
+                # Add extra safety checks to prevent any SL degradation
                 should_update = False
-                if pos['side'] == 'LONG' and updated_pos.sl > pos['sl_current']:
-                    should_update = True  # SL moves up for longs
-                elif pos['side'] == 'SHORT' and updated_pos.sl < pos['sl_current']:
-                    should_update = True  # SL moves down for shorts
+                old_sl = pos['sl_current']
+                new_sl = updated_pos.sl
+                
+                if pos['side'] == 'LONG':
+                    # For longs: new SL must be higher (better protection)
+                    if new_sl > old_sl:
+                        # Additional safety: ensure new SL provides minimum profit
+                        min_required_pnl = 0.05  # Minimum 0.05 USDT profit
+                        projected_pnl = (new_sl - pos['entry']) * pos['qty']
+                        
+                        if projected_pnl >= min_required_pnl:
+                            should_update = True
+                            logger.debug(f"📊 {symbol}: SL improvement: {old_sl:.6f} → {new_sl:.6f}, projected profit: ${projected_pnl:.3f}")
+                        else:
+                            logger.warning(f"⚠️ {symbol}: New SL {new_sl:.6f} would give only ${projected_pnl:.3f} profit (< ${min_required_pnl:.2f})")
+                    elif new_sl < old_sl:
+                        logger.error(f"❌ {symbol}: CRITICAL - Trailing tried to WORSEN SL: {old_sl:.6f} → {new_sl:.6f}!")
+                        
+                elif pos['side'] == 'SHORT':
+                    # For shorts: new SL must be lower (better protection)  
+                    if new_sl < old_sl:
+                        # Additional safety: ensure new SL provides minimum profit
+                        min_required_pnl = 0.05  # Minimum 0.05 USDT profit
+                        projected_pnl = (pos['entry'] - new_sl) * pos['qty']
+                        
+                        if projected_pnl >= min_required_pnl:
+                            should_update = True
+                            logger.debug(f"📊 {symbol}: SL improvement: {old_sl:.6f} → {new_sl:.6f}, projected profit: ${projected_pnl:.3f}")
+                        else:
+                            logger.warning(f"⚠️ {symbol}: New SL {new_sl:.6f} would give only ${projected_pnl:.3f} profit (< ${min_required_pnl:.2f})")
+                    elif new_sl > old_sl:
+                        logger.error(f"❌ {symbol}: CRITICAL - Trailing tried to WORSEN SL: {old_sl:.6f} → {new_sl:.6f}!")
                     
                 if should_update:
                     old_sl = pos['sl_current']
@@ -632,6 +661,11 @@ class SignalWardenLive:
                 logger.warning(f"⚠️ Could not verify position for SL update {symbol}: {pos_check_error}")
                 return
             
+            # CRITICAL FIX: Cancel old SL orders FIRST, then create new one
+            # This prevents race condition where old SL triggers before new one is active
+            
+            import time
+            
             # Get existing stop loss orders first
             old_sl_orders = []
             try:
@@ -643,16 +677,28 @@ class SignalWardenLive:
             except Exception as orders_error:
                 logger.warning(f"⚠️ Could not fetch open orders for {symbol}: {orders_error}")
             
-            # Small delay to avoid rate limits
-            import time
-            time.sleep(0.1)
+            # STEP 1: Cancel ALL old SL orders immediately to prevent race condition
+            cancelled_orders = []
+            if old_sl_orders:
+                logger.info(f"🚫 {symbol}: Cancelling {len(old_sl_orders)} old SL orders to prevent race condition")
+                for old_order in old_sl_orders:
+                    try:
+                        self.exchange.cancel_order(old_order['id'], ccxt_sym)
+                        cancelled_orders.append(old_order)
+                        logger.debug(f"🚫 {symbol}: Cancelled old SL order {old_order['id']} @ {old_order.get('stopPrice')}")
+                        time.sleep(0.05)  # Small delay between cancellations
+                    except Exception as cancel_error:
+                        logger.warning(f"⚠️ {symbol}: Could not cancel old SL order {old_order['id']}: {cancel_error}")
+                
+                # Wait a bit to ensure cancellations are processed
+                time.sleep(0.2)
             
-            # First, try to create NEW stop loss order
+            # STEP 2: Create NEW stop loss order
             sl_side = 'sell' if pos['side'] == 'LONG' else 'buy'
             new_sl_created = False
             new_sl_order = None
             
-            max_retries = 3
+            max_retries = 5  # Increased retries
             for attempt in range(max_retries):
                 try:
                     # Determine order parameters based on type
@@ -688,23 +734,38 @@ class SignalWardenLive:
                     logger.info(f"✅ {symbol}: New SL order created @ {pos['sl_current']:.6f} (ID: {new_sl_order['id']})")
                     break
                 except Exception as e:
-                    logger.warning(f"⚠️ {symbol}: SL creation attempt {attempt+1} failed: {e}")
+                    logger.warning(f"⚠️ {symbol}: SL creation attempt {attempt+1}/{max_retries} failed: {e}")
                     if attempt < max_retries - 1:
-                        time.sleep(1)  # Wait before retry
+                        time.sleep(0.5)  # Wait before retry
             
-            # Only cancel old orders if new one was created successfully
-            if new_sl_created and old_sl_orders:
-                time.sleep(0.2)  # Small delay
-                for old_order in old_sl_orders:
+            # CRITICAL: If new SL creation failed, try to restore old ones
+            if not new_sl_created:
+                logger.error(f"❌ {symbol}: CRITICAL - Could not create new SL order after {max_retries} attempts!")
+                logger.error(f"❌ {symbol}: Position may be UNPROTECTED! Manual intervention required!")
+                
+                # Try to restore at least one old SL order if we cancelled any
+                if cancelled_orders:
+                    logger.warning(f"🛡️ {symbol}: Attempting to restore protection with old SL level...")
                     try:
-                        self.exchange.cancel_order(old_order['id'], ccxt_sym)
-                        logger.debug(f"🚫 {symbol}: Cancelled old SL order {old_order['id']}")
-                    except Exception as cancel_error:
-                        logger.warning(f"⚠️ {symbol}: Could not cancel old SL order {old_order['id']}: {cancel_error}")
-            elif not new_sl_created:
-                logger.error(f"❌ {symbol}: CRITICAL - Could not create new SL order! Position may be unprotected!")
-                if old_sl_orders:
-                    logger.warning(f"🛡️ {symbol}: Keeping {len(old_sl_orders)} existing SL orders as fallback")
+                        # Use the last cancelled order's price as emergency SL
+                        emergency_sl = cancelled_orders[-1].get('stopPrice', pos['sl_current'])
+                        emergency_order = self.exchange.create_order(
+                            ccxt_sym,
+                            'stop_market',
+                            sl_side,
+                            pos['qty'],
+                            None,
+                            params={
+                                'stopPrice': emergency_sl,
+                                'reduceOnly': True,
+                                'timeInForce': 'GTC'
+                            }
+                        )
+                        logger.warning(f"🛡️ {symbol}: Emergency SL created @ {emergency_sl} (ID: {emergency_order['id']})")
+                    except Exception as emergency_error:
+                        logger.error(f"❌ {symbol}: Emergency SL creation also failed: {emergency_error}")
+                        logger.error(f"❌ {symbol}: POSITION IS COMPLETELY UNPROTECTED!")
+                
                 return  # Don't proceed if we couldn't create new SL
             
             # Update position with new SL order ID
