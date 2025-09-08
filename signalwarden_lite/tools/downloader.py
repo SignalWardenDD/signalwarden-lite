@@ -3,8 +3,21 @@ from datetime import datetime
 
 def ccxt_symbol(sym: str) -> str:
     """Convert symbol format: ADA_USDT -> ADA/USDT:USDT"""
-    base, quote = sym.split('_')
-    return f"{base}/{quote}:{quote}"  # USDT-M futures notation
+    # If already in CCXT format, return as-is
+    if '/' in sym and ':' in sym:
+        return sym
+        
+    # If contains underscore, convert from our format
+    if '_' in sym:
+        parts = sym.split('_')
+        if len(parts) == 2:
+            base, quote = parts
+            return f"{base}/{quote}:{quote}"  # USDT-M futures notation
+        else:
+            raise ValueError(f"Invalid symbol format: {sym}")
+    
+    # If no underscore, assume it's already in some other format
+    return sym
 
 def fetch_ohlcv_paginated(ex, symbol_ccxt: str, timeframe: str, start_ms: int, end_ms: int,
                           limit: int = 1500, pause_ms: int = 200) -> pd.DataFrame:

@@ -192,8 +192,7 @@ class SignalWardenLive:
                 # Calculate stop loss levels for synced position
                 try:
                     # Get recent data to calculate ATR
-                    ccxt_sym = self.ccxt_symbol(symbol)
-                    df = self.fetch_recent_data(ccxt_sym, '1h', 100)
+                    df = self.fetch_recent_data(symbol, '1h', 100)
                     
                     if df is not None and len(df) > 0:
                         # Calculate ATR
@@ -777,8 +776,23 @@ class SignalWardenLive:
         
     def ccxt_symbol(self, symbol: str) -> str:
         """Convert symbol format: ADA_USDT -> ADA/USDT:USDT"""
-        base, quote = symbol.split('_')
-        return f"{base}/{quote}:{quote}"
+        # If already in CCXT format, return as-is
+        if '/' in symbol and ':' in symbol:
+            return symbol
+            
+        # If contains underscore, convert from our format
+        if '_' in symbol:
+            parts = symbol.split('_')
+            if len(parts) == 2:
+                base, quote = parts
+                return f"{base}/{quote}:{quote}"
+            else:
+                logger.error(f"❌ Invalid symbol format: {symbol}")
+                return symbol
+        
+        # If no underscore, assume it's already in some other format
+        logger.warning(f"⚠️ Unexpected symbol format: {symbol}")
+        return symbol
         
     def fetch_ohlcv(self, symbol: str, timeframe: str, limit: int = 500) -> pd.DataFrame:
         """Fetch OHLCV data from exchange"""
@@ -1250,7 +1264,7 @@ class SignalWardenLive:
         """Load saved position states from persistent storage"""
         try:
             for symbol in self.cfg['symbols']:
-                ccxt_symbol = symbol.replace('_', '/')
+                ccxt_symbol = self.ccxt_symbol(symbol)
                 
                 # Skip if position already exists in memory
                 if symbol in self.active_positions:

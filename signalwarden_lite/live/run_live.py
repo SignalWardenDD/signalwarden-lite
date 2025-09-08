@@ -22,8 +22,21 @@ logger = get_logger(__name__)
 
 def ccxt_symbol(symbol: str) -> str:
     """Convert our symbol format to CCXT format"""
-    base, quote = symbol.split('_')
-    return f"{base}/{quote}:{quote}"
+    # If already in CCXT format, return as-is
+    if '/' in symbol and ':' in symbol:
+        return symbol
+        
+    # If contains underscore, convert from our format
+    if '_' in symbol:
+        parts = symbol.split('_')
+        if len(parts) == 2:
+            base, quote = parts
+            return f"{base}/{quote}:{quote}"
+        else:
+            raise ValueError(f"Invalid symbol format: {symbol}")
+    
+    # If no underscore, assume it's already in some other format
+    return symbol
 
 def make_exchange(cfg: dict):
     """Create and configure CCXT exchange"""
