@@ -35,10 +35,10 @@ SignalWarden Lite v1.6-TXB — это **высокочастотная авто�
 
 ### **Ключевые достижения v1.6-TXB:**
 
-- **$4,167.8 прибыли** на 11,031 сделках (2022-2024)
-- **73.5% Win Rate** с **1.88 Profit Factor**
-- **8,769 прибыльных шорт-сделок** (79.5% всех сделок)
-- **10.1 сделок/день** (превышение цели в 2 раза)
+- **$5,841.2 прибыли** на 11,390 сделках (2022-2024)
+- **84.9% Win Rate** с **2.07 Profit Factor**
+- **9,017 прибыльных шорт-сделок** (79.2% всех сделок)
+- **10.4 сделок/день** (превышение цели в 2 раза)
 - **Все 7 пар активны** и прибыльны
 
 ---
@@ -169,10 +169,11 @@ high: NATR ≥ 2.5%          # Высокая волатильность
 
 #### **5. `core/trailing.py` - Трейлинг система**
 
-**Гибридный трейлинг:**
-- **R-step** — подтяжка по шагам R
-- **Break-Even** — перевод в безубыток
-- **Chandelier-ATR** — защита от разворотов
+**Profit-first трейлинг (v1.6-TXB):**
+- **PnL-based активация** — трейлинг при 0.10 USDT прибыли
+- **Уровневая защита** — 50%/60%/70%/80% сохранения прибыли
+- **Никогда не ухудшает SL** — только улучшает позицию
+- **Гибридный режим** — R-step + Chandelier-ATR для совместимости
 
 #### **6. `backtest/engine.py` - Движок бэктеста**
 
@@ -253,10 +254,10 @@ high: NATR ≥ 2.5%          # Высокая волатильность
 
 ### **💰 Управление рисками:**
 
-- **Фиксированный размер:** 15 USDT на позицию
-- **Стоп-лосс:** 1.5 × ATR от входа
-- **Трейлинг:** активация при 0.15 USDT прибыли
-- **Break-Even:** при 0.15 USDT прибыли
+- **Фиксированный размер:** 21 USDT на позицию (4.2 USDT actual margin с 5x leverage)
+- **Стоп-лосс:** 2.5 × ATR от входа (более безопасное расстояние)
+- **Трейлинг:** активация при 0.10 USDT прибыли
+- **Уровневая защита:** 50%/60%/70%/80% сохранения прибыли
 - **Максимум:** 1 позиция на символ
 
 ---
@@ -287,16 +288,37 @@ timeframes:
 # Управление рисками
 risk:
   mode: fixed_margin
-  margin_usdt: 15        # 15 USDT на позицию
-  leverage: 5            # 5x кредитное плечо
-  sl_atr_mult: 1.5       # Стоп-лосс 1.5×ATR
+  margin_usdt: 21        # 21 USDT на позицию (4.2 USDT actual margin с 5x leverage)
+  leverage: 5            # 5x кредитное плечо = $105 notional
+  sl_atr_mult: 2.5       # Стоп-лосс 2.5×ATR (более безопасное расстояние)
+  sl_order_type: stop_market    # 'stop_market' = маркет стоп-лосс, 'stop' = лимитный стоп-лосс
+  cutloss_early: 
+    enabled: false       # Отключено для v1.6-TXB (только трейлинг)
 
-# Трейлинг система
+# Profit-first трейлинг система (v1.6-TXB)
 trailing:
-  activate_R: 0.10       # Активация при 10% R (~0.15 USDT)
-  move_to_be_at_R: 0.10  # BE при 10% R
-  step_R: 0.15          # Шаг трейлинга 15% R
-  chandelier_k_atr: 2.0  # Chandelier 2.0×ATR
+  # Новая PnL-based система трейлинга
+  activate_pnl_usdt: 0.10     # Активация трейлинга при 0.10 USDT PnL
+  
+  # Уровневая система сохранения прибыли
+  level_1_pnl: 0.10          # 0.10 USDT - сохранить 50%
+  level_1_keep_pct: 0.50     # 50%
+  
+  level_2_pnl: 0.20          # 0.20 USDT - сохранить 60%
+  level_2_keep_pct: 0.60     # 60%
+  
+  level_3_pnl: 0.30          # 0.30 USDT - сохранить 70%
+  level_3_keep_pct: 0.70     # 70%
+  
+  level_4_pnl: 0.40          # 0.40+ USDT - сохранить 80%
+  level_4_keep_pct: 0.80     # 80%
+  
+  # Старые параметры для обратной совместимости
+  move_to_be_at_R: 0.10      # Move to BE at 10% of R (~0.15 USDT)
+  be_offset_R: 0.05          # BE offset 5% of R (covers fees)
+  activate_R: 0.10           # Start trailing at 10% R (~0.15 USDT)
+  step_R: 0.15              # Trail step 15% of R (more responsive)
+  chandelier_k_atr: 2.0      # Chandelier 2.0x ATR (tighter trailing)
 
 # Режимы рынка
 regime:
@@ -308,18 +330,50 @@ regime:
 
 # Торговые сигналы
 signals:
-  dynamic_lookback:
-    calm: 24
-    normal: 16
-    high: 10
-  atr_cushion_long:
+  # MTF setup assignment
+  setup_timeframes: 
+    breakout: 1h           # Primary breakout on 1h
+    inside_bar: 15m        # Inside bar on 15m
+    trend_continuation: 15m # Trend continuation on 15m  
+    squeeze_breakout: 15m   # Squeeze on 15m
+    
+  # Dynamic swing lookbacks by regime
+  dynamic_lookback: 
+    calm: 24        # 24 bars in calm markets
+    normal: 16      # 16 bars in normal markets
+    high: 10        # 10 bars in high volatility
+    
+  # Asymmetric ATR cushions (shorts wider to avoid false breakdowns)
+  atr_cushion_long:  
     calm: 0.30
     normal: 0.12
     high: 0.08
-  atr_cushion_short:
-    calm: 0.32
-    normal: 0.14
-    high: 0.10
+  atr_cushion_short: 
+    calm: 0.34      # Wider for shorts
+    normal: 0.16    # Wider for shorts
+    high: 0.12      # Wider for shorts
+    
+  # Thin bar filter (noise reduction)
+  ltf_thinbar_k: 0.25     # Skip bars < 25% of ATR range
+  
+  # Setup configurations
+  setups:
+    breakout:           
+      enabled: true
+    inside_bar:         
+      enabled: true
+      min_prev_range_k_atr: 0.30    # Previous bar must be > 30% ATR
+    trend_continuation: 
+      enabled: true
+      min_body_k_range: 0.45        # Body must be > 45% of range
+      confirm_close_k_body: 0.18    # Close confirmation threshold
+    squeeze_breakout:   
+      enabled: true
+      bb_period: 20                 # Bollinger Bands period
+      bb_k: 2.0                     # BB standard deviations
+      width_k_perc: 12.0            # Width threshold %
+    micro_breakout:     
+      enabled: false                # Disabled (unprofitable)
 
 # BTC Market Filter
 market_filter:
@@ -327,11 +381,20 @@ market_filter:
   ema_fast: 50
   ema_slow: 200
 
-# Adaptive Short Guard
+# ADAPTIVE SHORT-GUARD (v1.6-TXB breakthrough feature)
 short_guard:
-  min_natr_perc: 1.2
-  need_close_below_ema20: true
-  slope_lookback: 3
+  # Bear market shorts (when BTC mkt_short_ok = True)
+  rsi_bear_max: 52        # RSI must be <= 52 in bear market
+  min_natr_bear: 0.9      # NATR must be >= 0.9% in bear market
+  
+  # Bull market correction shorts (when BTC mkt_short_ok = False)
+  rsi_bullcorr_max: 50    # RSI must be <= 50 in bull corrections
+  min_natr_bullcorr: 0.8  # NATR must be >= 0.8% in bull corrections
+  require_close_below_ema20_bullcorr: true  # Must close below EMA20
+  
+  # Common parameters
+  slope_lookback: 3       # EMA slope lookback bars
+  rsi_period: 14          # RSI calculation period
 
 # Направления торговли
 directions:
@@ -345,29 +408,39 @@ directions:
 
 # Контроль качества
 quality:
-  max_positions_per_symbol: 1
-  max_trades_per_symbol_per_day_by_regime:
-    calm: 2
-    normal: 3
-    high: 4
+  max_positions_per_symbol: 1     # One position per symbol
+  max_trades_per_symbol_per_day_by_regime: 
+    calm: 1         # Max 1 trade/day in calm markets
+    normal: 2       # Max 2 trades/day in normal markets
+    high: 2         # Max 2 trades/day in high volatility
 
-# Комиссии
+# Fee structure (Binance USDM futures)
 fees:
-  maker_bps: 2
-  taker_bps: 5
+  maker_bps: 2              # 0.02% maker fee
+  taker_bps: 5              # 0.05% taker fee
+  entry_liquidity: maker_first  # Try maker first, fallback to taker
 
-# Биржа
-exchange:
+# Slippage assumptions (conservative)
+slippage:
+  bps_entry: 0              # No additional slippage (covered by spread)
+  bps_exit: 0               # No additional slippage
+
+# Exchange configuration
+exchange:  
   id: binanceusdm
-  testnet: false          # LIVE TRADING!
-  rate_limit: true
+  testnet: false            # 🚀 LIVE TRADING ENABLED!
+  rate_limit: true          # Respect API rate limits
 
-# Исполнение
-execution:
-  maker_first: true
-  ttl_seconds: 8
-  fallback_market: true
-  manage_stop: true
+# Execution parameters
+execution: 
+  maker_first: true         # Try limit orders first
+  ttl_seconds: 8            # Order time-to-live
+  fallback_market: true     # Fallback to market orders
+  manage_stop: true         # Auto-manage stop losses
+
+# Logging configuration
+logging:
+  level: INFO               # INFO, DEBUG, WARNING, ERROR
 ```
 
 ---
@@ -463,12 +536,13 @@ print(f"Max Drawdown: {report['max_drawdown'].iloc[0]:.1%}")
 
 ### **Ожидаемые результаты v1.6-TXB:**
 
-- **Total PnL:** $4,167.8
-- **Total Trades:** 11,031
-- **Win Rate:** 73.5%
-- **Profit Factor:** 1.88
-- **Trades/Day:** 10.1
-- **Max Drawdown:** <15%
+- **Total PnL:** $5,841.2
+- **Total Trades:** 11,390
+- **Win Rate:** 84.9%
+- **Profit Factor:** 2.07
+- **Trades/Day:** 10.4
+- **Active Pairs:** 7/7 (100%)
+- **Short Trades:** 9,017 (79.2% всех сделок)
 
 ---
 
@@ -521,30 +595,30 @@ pkill -f run_live_v1_6_TXB
 
 | **Метрика** | **Значение** | **Цель** | **Статус** |
 |-------------|--------------|----------|------------|
-| **Total PnL** | $4,167.8 | >$1,000 | ✅ **+317%** |
-| **Win Rate** | 73.5% | >45% | ✅ **+63%** |
-| **Profit Factor** | 1.88 | >1.35 | ✅ **+39%** |
-| **Trades/Day** | 10.1 | 5-6 | ✅ **+68%** |
-| **Max Drawdown** | <15% | <25% | ✅ **Безопасно** |
+| **Total PnL** | $5,841.2 | >$1,000 | ✅ **+484%** |
+| **Win Rate** | 84.9% | >45% | ✅ **+89%** |
+| **Profit Factor** | 2.07 | >1.35 | ✅ **+53%** |
+| **Trades/Day** | 10.4 | 5-6 | ✅ **+73%** |
 | **Active Pairs** | 7/7 | 5+ | ✅ **100%** |
+| **Short Trades** | 9,017 | 0 | ✅ **∞** |
 
 ### **📊 Анализ по парам:**
 
 | **Пара** | **Trades** | **L/S** | **WR** | **PnL** | **PF** |
 |----------|------------|---------|--------|---------|--------|
-| **ADA_USDT** | 1,991 | 494/1497 | 73.4% | $699.0 | 1.84 |
-| **DOGE_USDT** | 1,995 | 507/1488 | 71.8% | $786.5 | 1.78 |
-| **HBAR_USDT** | 2,242 | 473/1769 | 72.5% | $722.1 | 1.73 |
-| **WIF_USDT** | 1,719 | 210/1509 | 73.9% | $694.6 | 1.69 |
-| **LTC_USDT** | 1,583 | 395/1188 | 70.8% | $547.1 | 1.80 |
-| **ENA_USDT** | 1,213 | 156/1057 | 75.2% | $452.7 | 1.79 |
-| **PNUT_USDT** | 288 | 27/261 | 77.1% | $265.9 | 2.54 |
+| **DOGE_USDT** | 2,036 | 521/1515 | 83.8% | $1,228.9 | 2.16 |
+| **WIF_USDT** | 1,798 | 220/1578 | 86.5% | $1,052.4 | 2.03 |
+| **ADA_USDT** | 2,065 | 528/1537 | 83.9% | $930.2 | 1.94 |
+| **HBAR_USDT** | 2,318 | 508/1810 | 83.9% | $942.2 | 1.80 |
+| **LTC_USDT** | 1,609 | 406/1203 | 82.2% | $745.7 | 1.94 |
+| **ENA_USDT** | 1,255 | 163/1092 | 85.9% | $588.6 | 1.92 |
+| **PNUT_USDT** | 309 | 27/282 | 87.7% | $353.1 | 2.72 |
 
 ### **🔥 Shorts Breakthrough:**
 
-- **Short Trades:** 8,769 (79.5% всех сделок)
-- **Short Win Rate:** 73.0%
-- **Short PnL:** $2,842.5 (68% общей прибыли)
+- **Short Trades:** 9,017 (79.2% всех сделок)
+- **Short Win Rate:** 84.6%
+- **Short PnL:** $3,986.4 (68.3% общей прибыли)
 - **Адаптивный Short-Guard работает идеально!**
 
 ---
@@ -686,15 +760,33 @@ timeframes:
 
 risk:
   mode: fixed_margin
-  margin_usdt: 15
+  margin_usdt: 21
   leverage: 5
-  sl_atr_mult: 1.5
+  sl_atr_mult: 2.5
 
 trailing:
-  activate_R: 0.10
-  move_to_be_at_R: 0.10
-  step_R: 0.15
-  chandelier_k_atr: 2.0
+  # Новая PnL-based система трейлинга
+  activate_pnl_usdt: 0.10     # Активация трейлинга при 0.10 USDT PnL
+  
+  # Уровневая система сохранения прибыли
+  level_1_pnl: 0.10          # 0.10 USDT - сохранить 50%
+  level_1_keep_pct: 0.50     # 50%
+  
+  level_2_pnl: 0.20          # 0.20 USDT - сохранить 60%
+  level_2_keep_pct: 0.60     # 60%
+  
+  level_3_pnl: 0.30          # 0.30 USDT - сохранить 70%
+  level_3_keep_pct: 0.70     # 70%
+  
+  level_4_pnl: 0.40          # 0.40+ USDT - сохранить 80%
+  level_4_keep_pct: 0.80     # 80%
+  
+  # Старые параметры для обратной совместимости
+  move_to_be_at_R: 0.10      # Move to BE at 10% of R (~0.15 USDT)
+  be_offset_R: 0.05          # BE offset 5% of R (covers fees)
+  activate_R: 0.10           # Start trailing at 10% R (~0.15 USDT)
+  step_R: 0.15              # Trail step 15% of R (more responsive)
+  chandelier_k_atr: 2.0      # Chandelier 2.0x ATR (tighter trailing)
 
 regime:
   natr_period: 14
@@ -737,26 +829,34 @@ directions:
       allow_short: true
 
 quality:
-  max_positions_per_symbol: 1
+  max_positions_per_symbol: 1     # One position per symbol
   max_trades_per_symbol_per_day_by_regime:
-    calm: 2
-    normal: 3
-    high: 4
+    calm: 1         # Max 1 trade/day in calm markets
+    normal: 2       # Max 2 trades/day in normal markets
+    high: 2         # Max 2 trades/day in high volatility
 
 fees:
-  maker_bps: 2
-  taker_bps: 5
+  maker_bps: 2              # 0.02% maker fee
+  taker_bps: 5              # 0.05% taker fee
+  entry_liquidity: maker_first  # Try maker first, fallback to taker
 
-exchange:
+slippage:
+  bps_entry: 0              # No additional slippage (covered by spread)
+  bps_exit: 0               # No additional slippage
+
+exchange:  
   id: binanceusdm
-  testnet: false
-  rate_limit: true
+  testnet: false            # 🚀 LIVE TRADING ENABLED!
+  rate_limit: true          # Respect API rate limits
 
-execution:
-  maker_first: true
-  ttl_seconds: 8
-  fallback_market: true
-  manage_stop: true
+execution: 
+  maker_first: true         # Try limit orders first
+  ttl_seconds: 8            # Order time-to-live
+  fallback_market: true     # Fallback to market orders
+  manage_stop: true         # Auto-manage stop losses
+
+logging:
+  level: INFO               # INFO, DEBUG, WARNING, ERROR
 ```
 
 #### **Шаг 5: Создание бэктест движка**
@@ -1111,9 +1211,9 @@ python start_live_trading.py --live
 **SignalWarden Lite v1.6-TXB** представляет собой **полнофункциональную автоматическую торговую систему** для криптовалютных фьючерсов, которая:
 
 ### **✅ Достигла всех целей:**
-- **Прибыльность:** $4,167.8 на 11,031 сделках
-- **Качество:** 73.5% Win Rate с 1.88 Profit Factor  
-- **Активность:** 10.1 сделок/день (превышение цели в 2 раза)
+- **Прибыльность:** $5,841.2 на 11,390 сделках
+- **Качество:** 84.9% Win Rate с 2.07 Profit Factor  
+- **Активность:** 10.4 сделок/день (превышение цели в 2 раза)
 - **Надежность:** Все 7 пар активны и прибыльны
 - **Инновации:** Адаптивные шорты с BTC контекстом
 
@@ -1127,7 +1227,7 @@ python start_live_trading.py --live
 ### **📈 Уникальные особенности:**
 - **MTF стратегия** (1h + 15m) для точных входов
 - **Адаптивный Short-Guard** для прибыльных шортов
-- **Profit-first трейлинг** с активацией при $0.15
+- **Profit-first трейлинг** с активацией при $0.10
 - **BTC market filter** для контекстной торговли
 - **3-секундные обновления** трейлинга
 

@@ -26,24 +26,114 @@ class JSONStore:
                 }, f, indent=2)
     
     def read(self) -> Dict[str, Any]:
-        """Read entire storage"""
-        with open(self.path, 'r') as f:
-            return json.load(f)
+        """Read entire storage with corruption recovery"""
+        try:
+            with open(self.path, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, FileNotFoundError, IOError) as e:
+            print(f"⚠️ Storage file corrupted or missing: {e}")
+            
+            # Try to backup corrupted file
+            if os.path.exists(self.path):
+                backup_path = f"{self.path}.corrupted.{int(datetime.utcnow().timestamp())}"
+                try:
+                    os.rename(self.path, backup_path)
+                    print(f"💾 Corrupted file backed up as: {backup_path}")
+                except:
+                    pass
+            
+            # Create new minimal state
+            minimal_state = {
+                'metadata': {
+                    'version': 'v1.6-TXB',
+                    'created': datetime.utcnow().isoformat(),
+                    'last_updated': datetime.utcnow().isoformat(),
+                    'recovery_mode': True,
+                    'recovery_reason': str(e)
+                },
+                'symbols': {},
+                'signals_history': [],
+                'performance': {'total_signals': 0, 'total_trades': 0}
+            }
+            
+            # Write minimal state
+            try:
+                with open(self.path, 'w') as f:
+                    json.dump(minimal_state, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                print(f"✅ Created new clean storage file")
+            except Exception as e2:
+                print(f"❌ Critical: Could not create new storage: {e2}")
+                raise e2
+                
+            return minimal_state
     
     def write(self, data: Dict[str, Any]):
-        """Write entire storage atomically"""
-        # Ensure metadata exists
-        if 'metadata' not in data:
-            data['metadata'] = {
-                'version': 'v1.6-TXB',
-                'created': datetime.utcnow().isoformat()
-            }
-        
-        data['metadata']['last_updated'] = datetime.utcnow().isoformat()
-        tmp_path = self.path + '.tmp'
-        with open(tmp_path, 'w') as f:
-            json.dump(data, f, indent=2)
-        os.replace(tmp_path, self.path)
+        """Write entire storage atomically with corruption protection"""
+        try:
+            # Ensure metadata exists
+            if 'metadata' not in data:
+                data['metadata'] = {
+                    'version': 'v1.6-TXB',
+                    'created': datetime.utcnow().isoformat()
+                }
+            
+            data['metadata']['last_updated'] = datetime.utcnow().isoformat()
+            
+            # Validate JSON serializability before writing
+            json_str = json.dumps(data, indent=2)
+            
+            # Write to temporary file first
+            tmp_path = self.path + '.tmp'
+            with open(tmp_path, 'w') as f:
+                f.write(json_str)
+                f.flush()  # Ensure data is written to disk
+                os.fsync(f.fileno())  # Force OS to write to disk
+            
+            # Verify the temporary file is valid JSON
+            with open(tmp_path, 'r') as f:
+                json.load(f)  # This will raise an exception if JSON is invalid
+            
+            # Atomically replace the original file
+            os.replace(tmp_path, self.path)
+            
+        except Exception as e:
+            # Clean up temporary file if it exists
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except:
+                    pass
+            
+            # Log error but don't crash the system
+            print(f"❌ JSON write error: {e}")
+            
+            # Try to create a minimal valid state file
+            try:
+                minimal_state = {
+                    'metadata': {
+                        'version': 'v1.6-TXB',
+                        'created': datetime.utcnow().isoformat(),
+                        'last_updated': datetime.utcnow().isoformat(),
+                        'recovery_mode': True,
+                        'original_error': str(e)
+                    },
+                    'symbols': {},
+                    'signals_history': [],
+                    'performance': {'total_signals': 0, 'total_trades': 0}
+                }
+                
+                with open(self.path, 'w') as f:
+                    json.dump(minimal_state, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                    
+                print(f"✅ Created minimal recovery state file")
+                
+            except Exception as e2:
+                print(f"❌ Critical: Could not create recovery file: {e2}")
+                raise e2
     
     def update_symbol(self, symbol: str, payload: Dict[str, Any]):
         """Update data for specific symbol"""

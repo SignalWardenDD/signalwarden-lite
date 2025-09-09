@@ -5,6 +5,8 @@ def compute_market_bias(df_btc: pd.DataFrame, ema_fast: int = 50, ema_slow: int 
     """
     Вычисляет рыночное смещение на основе BTC
     Возвращает DataFrame с колонками mkt_long_ok и mkt_short_ok
+    
+    ИСПРАВЛЕНО: Более чувствительная логика определения тренда
     """
     out = df_btc.copy().sort_values('timestamp')
     
@@ -15,9 +17,33 @@ def compute_market_bias(df_btc: pd.DataFrame, ema_fast: int = 50, ema_slow: int 
     # Наклон медленной EMA (сравнение с 3 барами назад)
     out['ema_slow_slope'] = out['ema_slow'] - out['ema_slow'].shift(3)
     
-    # Условия для лонгов и шортов
-    out['mkt_long_ok'] = (out['ema_fast'] > out['ema_slow']) & (out['ema_slow_slope'] > 0)
-    out['mkt_short_ok'] = (out['ema_fast'] < out['ema_slow']) & (out['ema_slow_slope'] < 0)
+    # Наклон быстрой EMA (сравнение с 2 барами назад) - для более быстрого реагирования
+    out['ema_fast_slope'] = out['ema_fast'] - out['ema_fast'].shift(2)
+    
+    # ИСПРАВЛЕННАЯ ЛОГИКА: Более чувствительное определение тренда
+    
+    # Бычий тренд: EMA50 > EMA200 И (EMA200 растет ИЛИ EMA50 растет)
+    out['mkt_long_ok'] = (out['ema_fast'] > out['ema_slow']) & (
+        (out['ema_slow_slope'] > 0) | (out['ema_fast_slope'] > 0)
+    )
+    
+    # Медвежий тренд: EMA50 < EMA200 И (EMA200 падает ИЛИ EMA50 падает)
+    out['mkt_short_ok'] = (out['ema_fast'] < out['ema_slow']) & (
+        (out['ema_slow_slope'] < 0) | (out['ema_fast_slope'] < 0)
+    )
+    
+    # Дополнительная логика: если EMA50 пересекла EMA200, сразу переключаемся
+    # (даже если наклоны еще не изменились)
+    ema_cross_down = (out['ema_fast'] < out['ema_slow']) & (out['ema_fast'].shift(1) >= out['ema_slow'].shift(1))
+    ema_cross_up = (out['ema_fast'] > out['ema_slow']) & (out['ema_fast'].shift(1) <= out['ema_slow'].shift(1))
+    
+    # При пересечении вниз - разрешаем шорты, запрещаем лонги
+    out.loc[ema_cross_down, 'mkt_short_ok'] = True
+    out.loc[ema_cross_down, 'mkt_long_ok'] = False
+    
+    # При пересечении вверх - разрешаем лонги, запрещаем шорты  
+    out.loc[ema_cross_up, 'mkt_long_ok'] = True
+    out.loc[ema_cross_up, 'mkt_short_ok'] = False
     
     return out[['timestamp', 'mkt_long_ok', 'mkt_short_ok']]
 

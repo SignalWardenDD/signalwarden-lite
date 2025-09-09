@@ -131,6 +131,24 @@ def generate_signals(df: pd.DataFrame, p: SignalParams, market_gate: pd.DataFram
     # Final signals with adaptive guards
     out['allow_long']  = out['allow_long_raw']  & out['mkt_long_ok']  & long_guard
     out['allow_short'] = out['allow_short_raw'] & np.where(out['mkt_short_ok'], bear_guard, bullcorr_guard)
+    
+    # ДОПОЛНИТЕЛЬНАЯ ЛОГИКА: Более агрессивное переключение на шорты при падении рынка
+    # Если BTC в медвежьей фазе (mkt_short_ok = True), ослабляем требования для шортов
+    bear_market_mask = out['mkt_short_ok'] == True
+    
+    # В медвежьем рынке разрешаем шорты даже при более мягких условиях
+    out.loc[bear_market_mask, 'allow_short'] = (
+        out.loc[bear_market_mask, 'allow_short_raw'] & 
+        (out.loc[bear_market_mask, 'rsi'] <= 55) &  # Более мягкий RSI фильтр
+        (out.loc[bear_market_mask, 'natr'] >= 0.7)  # Более мягкий NATR фильтр
+    )
+    
+    # В бычьем рынке (mkt_long_ok = True), ослабляем требования для лонгов
+    bull_market_mask = out['mkt_long_ok'] == True
+    out.loc[bull_market_mask, 'allow_long'] = (
+        out.loc[bull_market_mask, 'allow_long_raw'] & 
+        (out.loc[bull_market_mask, 'rsi'] >= 35)  # Более мягкий RSI фильтр для лонгов
+    )
 
     # Entry price and reason selection (priority: breakout > inside > tc > squeeze)
     def _pick(r, side='long'):

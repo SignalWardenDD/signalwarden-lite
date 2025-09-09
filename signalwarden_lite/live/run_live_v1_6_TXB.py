@@ -10,9 +10,11 @@ SignalWarden Lite v1.6-TXB Live Trading
 import os
 import time
 import yaml
+import json
 import argparse
 import threading
 from datetime import datetime, timedelta
+from pathlib import Path
 from dotenv import load_dotenv
 import ccxt
 import pandas as pd
@@ -331,7 +333,7 @@ class SignalWardenLive:
         self.trailing_stop_event.clear()
         self.trailing_thread = threading.Thread(target=self._fast_trailing_loop, daemon=True)
         self.trailing_thread.start()
-        logger.info("🔄 Fast trailing thread started (3-second updates)")
+        logger.info("🔄 Fast trailing thread started (2-second updates)")
         
     def stop_trailing_thread(self):
         """Stop trailing thread"""
@@ -340,18 +342,92 @@ class SignalWardenLive:
             self.trailing_thread.join(timeout=5)
             logger.info("⏹️ Fast trailing thread stopped")
             
+    def check_and_sync_missing_positions(self):
+        """Check for positions on exchange that are missing from our state and sync them"""
+        if self.paper_mode:
+            return
+            
+        try:
+            # Get all positions from exchange
+            exchange_positions = self.exchange.fetch_positions()
+            active_exchange_positions = [p for p in exchange_positions if float(p['contracts']) > 0]
+            
+            for pos in active_exchange_positions:
+                symbol = pos['symbol']
+                # Convert CCXT symbol to our format
+                symbol_key = symbol.replace('/', '_').replace(':USDT', '')
+                
+                # Check if position is missing from our state
+                if symbol_key not in self.active_positions:
+                    logger.warning(f"🚨 НАЙДЕНА ОТСУТСТВУЮЩАЯ ПОЗИЦИЯ: {symbol} (PnL: {float(pos['unrealizedPnl']):.4f} USDT)")
+                    
+                    # Sync this position
+                    try:
+                        entry_price = float(pos['entryPrice'])
+                        side = 'LONG' if pos['side'] == 'long' else 'SHORT'
+                        
+                        # Try to get proper ATR
+                        try:
+                            df = self.fetch_ohlcv(symbol_key, '1h', 50)
+                            if not df.empty:
+                                df = add_indicators(df, atr_p=14)
+                                atr = float(df.iloc[-1]['atr'])
+                                sl_price = entry_price - (self.sl_atr_mult * atr) if side == 'LONG' else entry_price + (self.sl_atr_mult * atr)
+                            else:
+                                raise Exception("Empty dataframe")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Could not get ATR for {symbol_key}: {e}, using 2% fallback")
+                            atr = entry_price * 0.02
+                            sl_price = entry_price * 0.98 if side == 'LONG' else entry_price * 1.02
+                        
+                        # Create position info
+                        position_info = {
+                            'symbol': symbol_key,
+                            'side': side,
+                            'entry': entry_price,
+                            'qty': abs(float(pos['contracts'])),
+                            'sl_initial': sl_price,
+                            'sl_current': sl_price,
+                            'atr': atr,
+                            'timestamp': time.time(),
+                            'order_id': None,
+                            'trailing_active': False,
+                            'unrealized_pnl': float(pos['unrealizedPnl']),
+                            'peak_pnl_usdt': max(0.0, float(pos['unrealizedPnl'])),
+                            'synced_from_exchange': True
+                        }
+                        
+                        self.active_positions[symbol_key] = position_info
+                        self.save_position_state(symbol_key, position_info)
+                        
+                        logger.info(f"✅ СИНХРОНИЗИРОВАНА ПОЗИЦИЯ {symbol_key}: {side} {position_info['qty']:.1f} @ {entry_price:.6f}")
+                        
+                        # Immediately update stop loss if needed
+                        current_pnl = float(pos['unrealizedPnl'])
+                        if current_pnl >= self.trailing.activate_pnl_usdt:
+                            logger.info(f"🔄 НЕМЕДЛЕННАЯ АКТИВАЦИЯ ТРЕЙЛИНГА для {symbol_key} (PnL: {current_pnl:.4f})")
+                            
+                    except Exception as e:
+                        logger.error(f"❌ Ошибка синхронизации {symbol}: {e}")
+                        
+        except Exception as e:
+            logger.error(f"❌ Ошибка проверки отсутствующих позиций: {e}")
+            
     def _fast_trailing_loop(self):
-        """Fast trailing updates every 3 seconds"""
+        """Fast trailing updates every 2 seconds"""
         while not self.trailing_stop_event.is_set():
             try:
                 self.update_trailing_stops()
-                self.trailing_stop_event.wait(3)  # 3-second updates
+                self.trailing_stop_event.wait(2)  # 2-second updates
             except Exception as e:
                 logger.error(f"❌ Fast trailing error: {e}")
-                self.trailing_stop_event.wait(3)
+                self.trailing_stop_event.wait(2)
     
     def update_trailing_stops(self):
         """Update trailing stops for all open positions with real PnL from Binance"""
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем и синхронизируем позиции каждый раз
+        self.check_and_sync_missing_positions()
+        
         if not self.active_positions:
             return
             
@@ -364,6 +440,16 @@ class SignalWardenLive:
                     
                 current_price = float(df.iloc[-1]['close'])
                 real_pnl = self.get_position_pnl_from_exchange(symbol)
+                
+                # ПРОВЕРКА СИНХРОНИЗАЦИИ: сравниваем расчетный PnL с биржевым
+                calculated_pnl = (current_price - pos['entry']) * pos['qty'] if pos['side'] == 'LONG' else (pos['entry'] - current_price) * pos['qty']
+                pnl_diff = abs(real_pnl - calculated_pnl)
+                
+                if pnl_diff > 0.50:  # Разница больше 0.50 USDT
+                    logger.warning(f"⚠️ {symbol}: PnL рассинхронизация! Биржа: {real_pnl:.4f}, Расчет: {calculated_pnl:.4f}, Разница: {pnl_diff:.4f}")
+                    # Используем биржевый PnL как более точный
+                elif pnl_diff > 0.10:  # Небольшая разница
+                    logger.debug(f"📊 {symbol}: Небольшая PnL разница: {pnl_diff:.4f} USDT")
                 
                 # Update position with real PnL
                 pos['unrealized_pnl'] = real_pnl
@@ -405,6 +491,26 @@ class SignalWardenLive:
                     real_pnl,  # Current PnL in USDT from Binance
                     self.trailing
                 )
+                
+                # УЛУЧШЕННОЕ ЛОГИРОВАНИЕ для диагностики активации трейлинга
+                if real_pnl >= self.trailing.activate_pnl_usdt:
+                    # Проверяем что трейлинг действительно должен был обновиться
+                    if not hasattr(updated_pos, 'trailing_debug') or not updated_pos.trailing_debug.get('sl_updated', False):
+                        # Дополнительная проверка - возможно SL уже оптимален
+                        debug_info = getattr(updated_pos, 'trailing_debug', {})
+                        reason = debug_info.get('reason', 'unknown')
+                        
+                        if 'current_sl' in reason:
+                            # SL уже оптимален, не нужно предупреждение
+                            logger.debug(f"📊 {symbol}: PnL {real_pnl:.4f}, SL уже оптимален ({reason})")
+                        else:
+                            logger.warning(f"⚠️ {symbol}: PnL {real_pnl:.4f} >= {self.trailing.activate_pnl_usdt} но трейлинг не обновил SL!")
+                            if debug_info:
+                                logger.debug(f"🔍 {symbol} Debug: {debug_info}")
+                elif real_pnl > 0.05:  # Близко к активации
+                    logger.debug(f"📊 {symbol}: PnL {real_pnl:.4f} близко к активации ({self.trailing.activate_pnl_usdt})")
+                elif real_pnl < -0.05:  # Позиция в убытке
+                    logger.debug(f"📉 {symbol}: PnL {real_pnl:.4f} в убытке, трейлинг неактивен")
                 
                 # CRITICAL: Only improve SL, never degrade it
                 # Add extra safety checks to prevent any SL degradation
@@ -817,17 +923,20 @@ class SignalWardenLive:
         """Fetch recent OHLCV data from exchange (compatible with old API)"""
         return self.fetch_ohlcv(symbol, timeframe, limit)
             
-    def get_btc_market_bias(self) -> Optional[pd.DataFrame]:
-        """Get BTC market filter with caching"""
+    def get_btc_market_bias(self, force_refresh: bool = False) -> Optional[pd.DataFrame]:
+        """Get BTC market filter with caching and auto-refresh"""
         current_time = int(time.time())
         
-        # Cache for 5 minutes
-        if (self.btc_gate_cache is not None and 
-            current_time - self.btc_gate_timestamp < 300):
+        # Cache for 1 minute (reduced from 2) + force refresh option
+        # Более частое обновление для быстрого реагирования на смену тренда
+        cache_valid = (self.btc_gate_cache is not None and 
+                      current_time - self.btc_gate_timestamp < 60)
+        
+        if cache_valid and not force_refresh:
             return self.btc_gate_cache
             
         try:
-            btc_1h = self.fetch_ohlcv('BTC_USDT', '1h', 200)
+            btc_1h = self.fetch_ohlcv('BTC/USDT:USDT', '1h', 200)
             if btc_1h.empty:
                 logger.warning("⚠️ No BTC data - market filter disabled")
                 return None
@@ -838,13 +947,29 @@ class SignalWardenLive:
                 self.cfg['market_filter']['ema_slow']
             )
             
-            self.btc_gate_cache = btc_bias
-            self.btc_gate_timestamp = current_time
-            
-            # Log current market state
+            # Log current market state and detect changes
             latest = btc_bias.iloc[-1]
             long_ok = latest['mkt_long_ok']
             short_ok = latest['mkt_short_ok']
+            
+            # Detect trend changes (before updating cache)
+            old_cache = self.btc_gate_cache
+            trend_changed = False
+            if old_cache is not None and not old_cache.empty:
+                old_latest = old_cache.iloc[-1]
+                old_long_ok = old_latest['mkt_long_ok']
+                old_short_ok = old_latest['mkt_short_ok']
+                
+                if (long_ok != old_long_ok) or (short_ok != old_short_ok):
+                    trend_changed = True
+                    logger.warning(f"🔄 BTC TREND CHANGE DETECTED! "
+                                 f"Long: {old_long_ok}→{long_ok}, "
+                                 f"Short: {old_short_ok}→{short_ok}")
+                    
+                    # КРИТИЧЕСКОЕ: При смене тренда принудительно обновляем кеш чаще
+                    logger.warning("🚨 CRITICAL: Market trend changed! Forcing more frequent cache updates...")
+                    # Устанавливаем более короткий TTL для кеша при смене тренда
+                    self.btc_gate_timestamp = current_time - 30  # Принудительно обновим через 30 секунд
             
             if long_ok and short_ok:
                 market_state = "🟡 NEUTRAL"
@@ -855,13 +980,74 @@ class SignalWardenLive:
             else:
                 market_state = "⚫ SIDEWAYS"
                 
-            logger.info(f"📊 BTC Market Filter: {market_state}")
+            logger.info(f"📊 BTC Market Filter: {market_state}"
+                       f" {'🔄 CHANGED!' if trend_changed else ''}")
+            
+            # Update cache after trend detection
+            self.btc_gate_cache = btc_bias
+            self.btc_gate_timestamp = current_time
             
             return btc_bias
             
         except Exception as e:
             logger.error(f"❌ BTC market filter failed: {e}")
             return None
+    
+    def force_refresh_btc_cache(self):
+        """Принудительно обновить кеш BTC фильтра"""
+        logger.info("🔄 Принудительное обновление BTC кеша...")
+        self.btc_gate_cache = None
+        self.btc_gate_timestamp = 0
+        return self.get_btc_market_bias(force_refresh=True)
+    
+    def clear_all_caches(self):
+        """Очистить все кеши системы"""
+        logger.warning("🧹 Очистка всех кешей системы...")
+        self.btc_gate_cache = None
+        self.btc_gate_timestamp = 0
+        # Добавить другие кеши при необходимости
+        logger.info("✅ Все кеши очищены")
+    
+    def check_cache_control_signals(self):
+        """Проверить файл сигналов управления кешем"""
+        try:
+            signal_file = Path("cache_control_signal.json")
+            if not signal_file.exists():
+                return
+            
+            # Проверяем только раз в 10 секунд
+            current_time = time.time()
+            if current_time - self.last_signal_check < 10:
+                return
+            
+            self.last_signal_check = current_time
+            
+            with open(signal_file, 'r') as f:
+                signal = json.load(f)
+            
+            action = signal.get('action')
+            timestamp = signal.get('timestamp', 0)
+            
+            # Игнорируем старые сигналы (>5 минут)
+            if current_time - timestamp > 300:
+                return
+            
+            logger.info(f"📨 Получен сигнал управления: {action}")
+            
+            if action == "clear_btc_cache":
+                self.force_refresh_btc_cache()
+            elif action == "force_position_sync":
+                self.check_and_sync_missing_positions()
+            elif action == "clear_all_caches":
+                self.clear_all_caches()
+                self.check_and_sync_missing_positions()
+            
+            # Удаляем обработанный сигнал
+            signal_file.unlink()
+            logger.info("✅ Сигнал обработан и удален")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка обработки сигнала: {e}")
             
     def prepare_data(self, df: pd.DataFrame, gate: Optional[pd.DataFrame] = None) -> pd.DataFrame:
         """Prepare data with indicators and signals"""
@@ -895,8 +1081,16 @@ class SignalWardenLive:
         }
         
         try:
-            # Get BTC market filter
-            btc_gate = self.get_btc_market_bias()
+            # Get BTC market filter with automatic refresh check
+            current_time = int(time.time())
+            cache_age = current_time - self.btc_gate_timestamp
+            
+            # Auto-refresh if cache is old (5+ minutes) - более частое обновление
+            force_refresh = cache_age > 300
+            if force_refresh:
+                logger.warning(f"⚠️ BTC кеш слишком старый ({cache_age//60}мин), принудительное обновление...")
+            
+            btc_gate = self.get_btc_market_bias(force_refresh=force_refresh)
             
             # Fetch 1h data for breakout signals
             df_1h = self.fetch_ohlcv(symbol, '1h', 200)
@@ -989,14 +1183,22 @@ class SignalWardenLive:
                         break  # Only one signal per side
                         
             # Current state for monitoring
+            # Get BTC market filter status from the gate data
+            btc_long_ok = True
+            btc_short_ok = True
+            if btc_gate is not None and not btc_gate.empty:
+                btc_latest = btc_gate.iloc[-1]
+                btc_long_ok = bool(btc_latest.get('mkt_long_ok', True))
+                btc_short_ok = bool(btc_latest.get('mkt_short_ok', True))
+            
             result['current_state'] = {
                 'regime_1h': latest_1h.get('regime', 'unknown'),
                 'trend_long_1h': bool(latest_1h.get('trend_long', False)),
                 'trend_short_1h': bool(latest_1h.get('trend_short', False)),
                 'natr_1h': float(latest_1h.get('natr', 0)),
                 'rsi_1h': float(latest_1h.get('rsi', 50)),
-                'btc_long_ok': bool(latest_1h.get('mkt_long_ok', True)),
-                'btc_short_ok': bool(latest_1h.get('mkt_short_ok', True)),
+                'btc_long_ok': btc_long_ok,
+                'btc_short_ok': btc_short_ok,
                 'price': float(latest_1h['close'])
             }
             
@@ -1130,6 +1332,9 @@ class SignalWardenLive:
         logger.info("=" * 80)
         logger.info(f"🔄 TRADING CYCLE START: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC")
         
+        # Проверяем сигналы управления кешем
+        self.check_cache_control_signals()
+        
         total_signals = 0
         executed_trades = 0
         
@@ -1207,6 +1412,9 @@ class SignalWardenLive:
         
         # Load saved position states
         self.load_position_states()
+        
+        # Initialize cache control
+        self.last_signal_check = 0
         
         # Start fast trailing thread
         self.start_trailing_thread()

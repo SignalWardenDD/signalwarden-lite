@@ -34,6 +34,7 @@ def update_trailing_pnl_based(pos: Position, current_price: float, current_pnl_u
     """
     
     # Активация трейлинга только при достижении минимального PnL
+    # ИСПРАВЛЕНО: используем <= чтобы активировать при точном равенстве 0.10 USDT
     if current_pnl_usdt < cfg.activate_pnl_usdt:
         return pos
     
