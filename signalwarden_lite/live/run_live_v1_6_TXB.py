@@ -436,7 +436,13 @@ class SignalWardenLive:
                         logger.error(f"❌ {symbol}: Ошибка синхронизации позиции: {e}")
                         continue
                 
-                # Create position info from exchange data
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Очищаем старые данные перед синхронизацией
+                if symbol in self.active_positions:
+                    logger.warning(f"🧹 {symbol}: Очищаем старые данные позиции перед синхронизацией")
+                    del self.active_positions[symbol]
+                    self.cleanup_position_state(symbol)
+                
+                # Create position info from exchange data (ЧИСТЫЕ данные!)
                 position_info = {
                     'symbol': symbol,
                     'side': 'LONG' if pos['side'] == 'long' else 'SHORT',
@@ -448,13 +454,14 @@ class SignalWardenLive:
                     'atr': atr,
                     'timestamp': time.time(),
                     'order_id': None,
-                    'trailing_active': False,
+                    'trailing_active': False,  # НОВАЯ позиция - трейлинг НЕАКТИВЕН
                     'unrealized_pnl': float(pos['unrealizedPnl']),
-                    'peak_pnl_usdt': max(0.0, float(pos['unrealizedPnl'])),  # Initialize with current PnL
+                    'peak_pnl_usdt': max(0.0, float(pos['unrealizedPnl'])),  # Начинаем с текущего PnL
                     'synced_from_exchange': True
                 }
                 
                 self.active_positions[symbol] = position_info
+                logger.info(f"✅ {symbol}: Позиция синхронизирована с чистыми данными трейлинга")
                 synced_count += 1
                 
                 # Place stop loss order for synced position
@@ -1712,6 +1719,14 @@ class SignalWardenLive:
                 error_msg = f"❌ Position already open for {symbol} - skipping"
                 logger.warning(f"⚠️ {symbol}: {error_msg}")
                 return error_msg
+            
+            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Принудительно очищаем старые данные трейлинга
+            # Новая позиция НЕ должна наследовать трейлинг от предыдущей!
+            if symbol in self.active_positions:
+                logger.error(f"❌ {symbol}: КРИТИЧНО - обнаружены старые данные позиции!")
+                del self.active_positions[symbol]
+                self.cleanup_position_state(symbol)
+                logger.warning(f"🧹 {symbol}: Старые данные позиции очищены перед созданием новой")
             
             # Check if we have enough balance for new position (considering 5x leverage)
             if not self.can_open_new_position():
