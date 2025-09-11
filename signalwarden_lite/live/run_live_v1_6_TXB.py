@@ -25,8 +25,11 @@ from ..core.features import add_indicators
 from ..core.regimes import add_regime, RegimeThresholds
 from ..core.market import compute_market_bias
 from ..core.signals import generate_signals, SignalParams
-from ..core.trailing import TrailingConfig
+from ..core.trailing import TrailingConfig, update_trailing_hybrid
+from ..core.trailing_pnl_only import TrailingConfigPnLOnly, update_trailing_pnl_only
 from ..core.storage import JSONStore
+from ..core.state_validator import StateValidator
+from ..core.auto_fixer import AutoFixer
 from ..core.types import Side
 from ..utils.logger import get_logger
 
@@ -42,13 +45,34 @@ class SignalWardenLive:
         self.setup_exchange()
         self.setup_components()
         
-        # State tracking
+        # State tracking with cache management
         self.last_1h_fetch = {}  # symbol -> timestamp
         self.last_15m_fetch = {}  # symbol -> timestamp  
         self.btc_gate_cache = None
         self.btc_gate_timestamp = 0
+        self.data_cache = {}  # symbol_timeframe -> (data, timestamp)
+        self.cache_ttl = 60  # Cache TTL: 60 seconds
         
         logger.info(f"🚀 SignalWarden v1.6-TXB initialized ({'Paper' if paper_mode else 'LIVE'} mode)")
+    
+    def clear_stale_cache(self):
+        """Clear stale cache entries to prevent trading on outdated data"""
+        current_time = time.time()
+        stale_keys = []
+        
+        for key, (data, timestamp) in self.data_cache.items():
+            if current_time - timestamp > self.cache_ttl:
+                stale_keys.append(key)
+        
+        for key in stale_keys:
+            del self.data_cache[key]
+            logger.debug(f"🧹 Cleared stale cache for {key}")
+        
+        # Clear BTC gate cache if stale
+        if self.btc_gate_cache is not None and current_time - self.btc_gate_timestamp > self.cache_ttl:
+            self.btc_gate_cache = None
+            self.btc_gate_timestamp = 0
+            logger.debug("🧹 Cleared stale BTC gate cache")
         
     def load_config(self):
         """Load and validate configuration"""
@@ -141,8 +165,19 @@ class SignalWardenLive:
         # Regime thresholds
         self.regime_thresholds = RegimeThresholds(**self.cfg['regime']['calm_thresholds'])
         
-        # Trailing config
-        self.trailing = TrailingConfig(**self.cfg['trailing'])
+        # Trailing config - ЧИСТО PnL-BASED ТРЕЙЛИНГ ПО УРОВНЯМ
+        # Простая и понятная система только по прибыли в долларах
+        trailing_cfg = self.cfg.get('trailing', {})
+        self.trailing = TrailingConfigPnLOnly(
+            level_1_pnl=trailing_cfg.get('level_1_pnl', 0.06),
+            level_1_keep_pct=trailing_cfg.get('level_1_keep_pct', 0.50),
+            level_2_pnl=trailing_cfg.get('level_2_pnl', 0.15),
+            level_2_keep_pct=trailing_cfg.get('level_2_keep_pct', 0.60),
+            level_3_pnl=trailing_cfg.get('level_3_pnl', 0.25),
+            level_3_keep_pct=trailing_cfg.get('level_3_keep_pct', 0.70),
+            level_4_pnl=trailing_cfg.get('level_4_pnl', 0.35),
+            level_4_keep_pct=trailing_cfg.get('level_4_keep_pct', 0.80)
+        )
         
         # Storage
         self.storage = JSONStore('trading_state_v1_6_TXB.json')
@@ -156,8 +191,17 @@ class SignalWardenLive:
         # Active positions tracking (1 position per symbol max)
         self.active_positions = {}  # symbol -> position_info
         
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Загрузить позиции из торгового состояния
+        self.load_positions_from_state()
+        
+        # Initialize validation and auto-fix components
+        self.setup_validation_and_fixes()
+        
         # Sync positions from exchange on startup
         self.sync_positions_from_exchange()
+        
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Принудительная очистка несуществующих позиций
+        self.force_cleanup_nonexistent_positions()
         
         # Trailing thread control
         self.trailing_thread = None
@@ -165,6 +209,96 @@ class SignalWardenLive:
         
         logger.info(f"⚙️ Risk per trade: {self.margin_usdt} USDT notional ({self.margin_usdt/self.leverage:.1f} USDT actual margin)")
         logger.info(f"🛡️ Stop-loss type: {self.sl_order_type} ({'маркет стоп-лосс (рыночный)' if self.sl_order_type == 'stop_market' else 'лимитный стоп-лосс'})")
+    
+    def load_positions_from_state(self):
+        """КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Загрузить активные позиции из торгового состояния"""
+        try:
+            state_data = self.storage.load_state()
+            symbols_data = state_data.get('symbols', {})
+            
+            loaded_count = 0
+            for symbol, data in symbols_data.items():
+                if symbol.endswith('_position'):
+                    continue
+                
+                active_pos = data.get('active_position')
+                if active_pos and active_pos.get('entry', 0) > 0:
+                    # Инициализируем недостающие поля для трейлинга
+                    if 'peak_pnl_usdt' not in active_pos:
+                        active_pos['peak_pnl_usdt'] = 0.0
+                    if 'trailing_active' not in active_pos:
+                        active_pos['trailing_active'] = False
+                    if 'trailing_level' not in active_pos:
+                        active_pos['trailing_level'] = 'INACTIVE'
+                    
+                    # Загружаем позицию в память
+                    self.active_positions[symbol] = active_pos
+                    loaded_count += 1
+                    
+                    logger.info(f"🔄 Загружена позиция {symbol}: {active_pos['side']} {active_pos['qty']:.4f} @ ${active_pos['entry']:.6f}")
+                    logger.info(f"   Peak PnL: ${active_pos['peak_pnl_usdt']:.4f}, Trailing: {active_pos['trailing_active']}")
+            
+            if loaded_count > 0:
+                logger.info(f"✅ Загружено позиций из состояния: {loaded_count}")
+            else:
+                logger.info("ℹ️ Активные позиции в состоянии не найдены")
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка загрузки позиций из состояния: {e}")
+        
+    def setup_validation_and_fixes(self):
+        """Настроить валидацию и автоисправление"""
+        try:
+            # Инициализировать валидатор и автоисправитель
+            self.state_validator = StateValidator('trading_state_v1_6_TXB.json', self.exchange)
+            self.auto_fixer = AutoFixer('trading_state_v1_6_TXB.json', self.exchange)
+            
+            # Запустить автоматическое исправление при старте
+            logger.info("🔧 Запуск автоматического исправления при старте...")
+            fix_result = self.auto_fixer.run_auto_fix(self.cfg['symbols'])
+            
+            if fix_result['success']:
+                if fix_result['fixes_applied']:
+                    logger.info(f"✅ Автоисправление завершено. Применено исправлений: {len(fix_result['fixes_applied'])}")
+                    for fix in fix_result['fixes_applied']:
+                        logger.info(f"   - {fix['type']}: {fix.get('symbols', fix.get('positions', 'N/A'))}")
+                else:
+                    logger.info("✅ Проблем не найдено, автоисправление не требуется")
+            else:
+                logger.warning(f"⚠️ Автоисправление завершено с ошибками: {fix_result['errors']}")
+                
+            # Запустить валидацию
+            validation_result = self.state_validator.run_full_validation(self.cfg['symbols'])
+            if not validation_result['overall_valid']:
+                logger.warning(f"⚠️ Найдены проблемы валидации: {validation_result['total_errors']}")
+            else:
+                logger.info("✅ Валидация состояния пройдена успешно")
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка настройки валидации и автоисправления: {e}")
+            
+    def run_periodic_validation(self):
+        """Запустить периодическую валидацию"""
+        try:
+            logger.info("🔍 Периодическая валидация состояния...")
+            
+            # Быстрая валидация консистентности
+            validation_result = self.state_validator.run_full_validation(self.cfg['symbols'])
+            
+            if not validation_result['overall_valid']:
+                logger.warning(f"⚠️ Найдены проблемы валидации: {validation_result['total_errors']}")
+                
+                # Попытаться исправить автоматически
+                fix_result = self.auto_fixer.run_auto_fix(self.cfg['symbols'])
+                if fix_result['success'] and fix_result['fixes_applied']:
+                    logger.info(f"✅ Автоматически исправлено: {len(fix_result['fixes_applied'])} проблем")
+                else:
+                    logger.warning("⚠️ Не удалось автоматически исправить проблемы")
+            else:
+                logger.debug("✅ Периодическая валидация пройдена успешно")
+                
+        except Exception as e:
+            logger.error(f"❌ Ошибка периодической валидации: {e}")
         
     def sync_positions_from_exchange(self):
         """Sync positions from Binance exchange"""
@@ -191,48 +325,116 @@ class SignalWardenLive:
                 if symbol not in self.cfg['symbols']:
                     continue
                     
-                # Calculate stop loss levels for synced position
-                try:
-                    # Get recent data to calculate ATR
-                    df = self.fetch_recent_data(symbol, '1h', 100)
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: НЕ ПЕРЕЗАПИСЫВАЕМ ТРЕЙЛИНГ SL!
+                # Проверяем, есть ли уже активная позиция с трейлингом
+                existing_pos = self.active_positions.get(symbol)
+                if existing_pos and existing_pos.get('trailing_active', False):
+                    # Позиция уже в трейлинге - НЕ ТРОГАЕМ SL!
+                    logger.warning(f"🔒 {symbol}: Позиция в трейлинге - пропускаем пересчет SL при синхронизации")
+                    logger.warning(f"🔒 {symbol}: Текущий трейлинг SL: {existing_pos.get('sl_current', 'N/A')}")
                     
-                    if df is not None and len(df) > 0:
-                        # Calculate ATR
-                        df['hl'] = df['high'] - df['low']
-                        df['hc'] = abs(df['high'] - df['close'].shift())
-                        df['lc'] = abs(df['low'] - df['close'].shift())
-                        df['tr'] = df[['hl', 'hc', 'lc']].max(axis=1)
-                        atr = df['tr'].rolling(window=14).mean().iloc[-1]
-                        
-                        # Calculate stop loss
-                        entry_price = float(pos['entryPrice'])
-                        side = 'LONG' if pos['side'] == 'long' else 'SHORT'
-                        
-                        if side == 'LONG':
-                            sl_price = entry_price - (self.sl_atr_mult * atr)
-                        else:
-                            sl_price = entry_price + (self.sl_atr_mult * atr)
-                    else:
-                        # Fallback: use 2% stop loss if no data
-                        entry_price = float(pos['entryPrice'])
-                        side = 'LONG' if pos['side'] == 'long' else 'SHORT'
-                        
-                        if side == 'LONG':
-                            sl_price = entry_price * 0.98
-                        else:
-                            sl_price = entry_price * 1.02
-                        atr = entry_price * 0.02  # 2% fallback
-                        
-                except Exception as e:
-                    logger.warning(f"⚠️ Could not calculate SL for {symbol}: {e}, using 2% fallback")
+                    # Просто обновляем данные позиции без изменения SL
                     entry_price = float(pos['entryPrice'])
                     side = 'LONG' if pos['side'] == 'long' else 'SHORT'
                     
-                    if side == 'LONG':
-                        sl_price = entry_price * 0.98
-                    else:
-                        sl_price = entry_price * 1.02
-                    atr = entry_price * 0.02
+                    # Используем существующий SL из трейлинга
+                    sl_price = existing_pos['sl_current']
+                    
+                    # Получаем ATR для сохранения в позиции
+                    try:
+                        df = self.fetch_recent_data(symbol, '1h', 100)
+                        if df is not None and len(df) > 0:
+                            from signalwarden_lite.core.features import add_indicators
+                            df = add_indicators(df, atr_p=14)
+                            atr = float(df.iloc[-1]['atr'])
+                        else:
+                            atr = entry_price * 0.01  # Fallback ATR
+                    except:
+                        atr = entry_price * 0.01  # Fallback ATR
+                        
+                else:
+                    # Новая позиция или позиция без трейлинга - рассчитываем SL
+                    try:
+                        # Get recent data to calculate ATR
+                        df = self.fetch_recent_data(symbol, '1h', 100)
+                        
+                        if df is not None and len(df) > 0:
+                            # ИСПРАВЛЕНО: Используем правильный расчет ATR через add_indicators
+                            from signalwarden_lite.core.features import add_indicators
+                            df = add_indicators(df, atr_p=14)
+                            atr = float(df.iloc[-1]['atr'])
+                            
+                            # Calculate stop loss with minimum ATR protection
+                            entry_price = float(pos['entryPrice'])
+                            side = 'LONG' if pos['side'] == 'long' else 'SHORT'
+                            
+                            # ИСПРАВЛЕНО: Используем чистый ATR (как в успешном бэктесте!)
+                            # НО с минимальной защитой от микроубытков в ultra_calm режиме
+                            min_atr = entry_price * 0.008  # Минимум 0.8% от цены для защиты от микроубытков
+                            effective_atr = max(atr, min_atr)
+                            
+                            # Логирование защиты от микроубытков
+                            if effective_atr > atr:
+                                logger.warning(f"🛡️ {symbol}: ATR защита активна при синхронизации! Оригинальный ATR {atr:.6f} → Эффективный ATR {effective_atr:.6f}")
+                            
+                            if side == 'LONG':
+                                sl_price = entry_price - (self.sl_atr_mult * effective_atr)
+                            else:
+                                sl_price = entry_price + (self.sl_atr_mult * effective_atr)
+                                
+                            # Логирование SL для диагностики
+                            sl_distance = abs(sl_price - entry_price)
+                            sl_distance_pct = (sl_distance / entry_price) * 100
+                            logger.info(f"🔍 {symbol} {side} SYNC SL: Entry {entry_price:.6f}, SL {sl_price:.6f}, Distance {sl_distance:.6f} ({sl_distance_pct:.2f}%)")
+                            
+                            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Создаем stop-market ордер только для новых позиций
+                            try:
+                                ccxt_sym = self.ccxt_symbol(symbol)
+                                sl_side = 'sell' if side == 'LONG' else 'buy'
+                                
+                                # Отменяем старые SL ордера
+                                try:
+                                    open_orders = self.exchange.fetch_open_orders(ccxt_sym)
+                                    for order in open_orders:
+                                        if order['type'] in ['stop_market', 'stop'] and order['info'].get('reduceOnly'):
+                                            self.exchange.cancel_order(order['id'], ccxt_sym)
+                                            logger.info(f"🗑️ {symbol}: Отменен старый SL ордер {order['id']}")
+                                except Exception as e:
+                                    logger.warning(f"⚠️ {symbol}: Не удалось отменить старые ордера: {e}")
+                                
+                                # Создаем новый stop-market ордер
+                                new_sl_order = self.exchange.create_order(
+                                    ccxt_sym,
+                                    'stop_market',
+                                    sl_side,
+                                    pos['contracts'],
+                                    None,  # Нет цены исполнения для stop_market
+                                    params={
+                                        'stopPrice': sl_price,
+                                        'reduceOnly': True,
+                                        'timeInForce': 'GTC'
+                                    }
+                                )
+                                logger.info(f"✅ {symbol}: Создан новый stop-market ордер {new_sl_order['id']} @ {sl_price:.6f}")
+                                
+                            except Exception as e:
+                                logger.error(f"❌ {symbol}: Ошибка создания stop-market ордера: {e}")
+                            
+                            # Обновляем ATR на эффективное значение
+                            atr = effective_atr
+                        else:
+                            # Fallback: use 2% stop loss if no data
+                            entry_price = float(pos['entryPrice'])
+                            side = 'LONG' if pos['side'] == 'long' else 'SHORT'
+                            
+                            if side == 'LONG':
+                                sl_price = entry_price * 0.98
+                            else:
+                                sl_price = entry_price * 1.02
+                            atr = entry_price * 0.02  # 2% fallback
+                    except Exception as e:
+                        logger.error(f"❌ {symbol}: Ошибка синхронизации позиции: {e}")
+                        continue
                 
                 # Create position info from exchange data
                 position_info = {
@@ -242,6 +444,7 @@ class SignalWardenLive:
                     'qty': abs(float(pos['contracts'])),
                     'sl_initial': sl_price,
                     'sl_current': sl_price,
+                    'last_updated_sl': sl_price,  # КРИТИЧНО: устанавливаем чтобы избежать спама
                     'atr': atr,
                     'timestamp': time.time(),
                     'order_id': None,
@@ -269,9 +472,76 @@ class SignalWardenLive:
         except Exception as e:
             logger.error(f"❌ Failed to sync positions from exchange: {e}")
     
+    def force_cleanup_nonexistent_positions(self):
+        """Принудительная очистка позиций, которые не существуют на бирже"""
+        if self.paper_mode:
+            return
+            
+        logger.info("🧹 Принудительная очистка несуществующих позиций...")
+        
+        positions_to_remove = []
+        
+        for symbol in list(self.active_positions.keys()):
+            try:
+                ccxt_sym = self.ccxt_symbol(symbol)
+                exchange_positions = self.exchange.fetch_positions([ccxt_sym])
+                
+                position_exists = False
+                for exchange_pos in exchange_positions:
+                    if float(exchange_pos['contracts']) != 0:
+                        position_exists = True
+                        break
+                
+                if not position_exists:
+                    positions_to_remove.append(symbol)
+                    logger.warning(f"🧹 {symbol}: Позиция не существует на бирже, помечена к удалению")
+                    
+            except Exception as e:
+                logger.warning(f"⚠️ {symbol}: Не удалось проверить позицию на бирже: {e}")
+        
+        # Удаляем несуществующие позиции
+        for symbol in positions_to_remove:
+            if symbol in self.active_positions:
+                del self.active_positions[symbol]
+                self.save_position_state(symbol, None)  # Удаляем из хранилища
+                logger.info(f"🗑️ {symbol}: Позиция удалена из локального трекинга")
+        
+        if positions_to_remove:
+            logger.info(f"✅ Очищено {len(positions_to_remove)} несуществующих позиций")
+        else:
+            logger.info("✅ Все позиции синхронизированы с биржей")
+    
     def has_open_position(self, symbol: str) -> bool:
-        """Check if symbol has an open position"""
-        return symbol in self.active_positions
+        """Check if symbol has an open position (both locally and on exchange)"""
+        # Сначала проверяем локально
+        if symbol not in self.active_positions:
+            return False
+            
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем существование позиции на бирже
+        if not self.paper_mode:
+            try:
+                ccxt_sym = self.ccxt_symbol(symbol)
+                exchange_positions = self.exchange.fetch_positions([ccxt_sym])
+                
+                for exchange_pos in exchange_positions:
+                    if float(exchange_pos['contracts']) != 0:
+                        # Позиция существует на бирже
+                        return True
+                
+                # Позиция НЕ существует на бирже - очищаем локально
+                logger.warning(f"🧹 {symbol}: Позиция не существует на бирже, очищаем локально")
+                if symbol in self.active_positions:
+                    del self.active_positions[symbol]
+                    self.save_position_state(symbol, None)  # Удаляем из хранилища
+                return False
+                
+            except Exception as e:
+                logger.warning(f"⚠️ {symbol}: Не удалось проверить позицию на бирже: {e}")
+                # В случае ошибки возвращаем локальное состояние
+                return True
+        
+        # В paper mode используем только локальное состояние
+        return True
     
     def can_open_new_position(self) -> bool:
         """Check if we have enough balance for a new position"""
@@ -309,20 +579,27 @@ class SignalWardenLive:
     def get_position_pnl_from_exchange(self, symbol: str) -> float:
         """Get real-time PnL from exchange"""
         if self.paper_mode:
+            logger.debug(f"📊 {symbol}: Paper mode - возвращаем PnL=0.0")
             return 0.0
             
         try:
             ccxt_sym = self.ccxt_symbol(symbol)
             positions = self.exchange.fetch_positions([ccxt_sym])
             
+            logger.debug(f"📊 {symbol}: Получено позиций с биржи: {len(positions)}")
+            
             for pos in positions:
-                if float(pos['contracts']) != 0:
-                    return float(pos['unrealizedPnl'])
-                    
+                contracts = float(pos['contracts'])
+                if contracts != 0:
+                    pnl = float(pos['unrealizedPnl'])
+                    logger.debug(f"📊 {symbol}: Найдена позиция - Contracts: {contracts}, PnL: {pnl:.4f}")
+                    return pnl
+            
+            logger.debug(f"📊 {symbol}: Позиция не найдена на бирже (contracts=0)")
             return 0.0
             
         except Exception as e:
-            logger.error(f"❌ Failed to get PnL for {symbol}: {e}")
+            logger.warning(f"⚠️ {symbol}: Ошибка получения PnL с биржи: {e}")
             return 0.0
         
     def start_trailing_thread(self):
@@ -372,7 +649,11 @@ class SignalWardenLive:
                             if not df.empty:
                                 df = add_indicators(df, atr_p=14)
                                 atr = float(df.iloc[-1]['atr'])
-                                sl_price = entry_price - (self.sl_atr_mult * atr) if side == 'LONG' else entry_price + (self.sl_atr_mult * atr)
+                                # Защита от микроубытков: минимальный ATR
+                                min_atr = entry_price * 0.008  # 0.8% от цены
+                                effective_atr = max(atr, min_atr)
+                                sl_price = entry_price - (self.sl_atr_mult * effective_atr) if side == 'LONG' else entry_price + (self.sl_atr_mult * effective_atr)
+                                atr = effective_atr  # Обновляем для логирования
                             else:
                                 raise Exception("Empty dataframe")
                         except Exception as e:
@@ -388,6 +669,7 @@ class SignalWardenLive:
                             'qty': abs(float(pos['contracts'])),
                             'sl_initial': sl_price,
                             'sl_current': sl_price,
+                            'last_updated_sl': sl_price,  # КРИТИЧНО: устанавливаем чтобы избежать спама
                             'atr': atr,
                             'timestamp': time.time(),
                             'order_id': None,
@@ -404,7 +686,7 @@ class SignalWardenLive:
                         
                         # Immediately update stop loss if needed
                         current_pnl = float(pos['unrealizedPnl'])
-                        if current_pnl >= self.trailing.activate_pnl_usdt:
+                        if current_pnl > 0:
                             logger.info(f"🔄 НЕМЕДЛЕННАЯ АКТИВАЦИЯ ТРЕЙЛИНГА для {symbol_key} (PnL: {current_pnl:.4f})")
                             
                     except Exception as e:
@@ -425,11 +707,16 @@ class SignalWardenLive:
     
     def update_trailing_stops(self):
         """Update trailing stops for all open positions with real PnL from Binance"""
-        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем и синхронизируем позиции каждый раз
+        # ИСПРАВЛЕНО: Синхронизируем реже чтобы избежать спама
+        # Проверяем отсутствующие позиции каждый раз, но полную синхронизацию - реже
         self.check_and_sync_missing_positions()
         
         if not self.active_positions:
+            logger.debug("📊 Нет активных позиций для трейлинга")
             return
+        
+        # КРИТИЧЕСКАЯ ПРОВЕРКА БЕЗОПАСНОСТИ: Все позиции должны иметь активные SL ордера
+        self.verify_all_positions_have_sl_protection()
             
         for symbol, pos in list(self.active_positions.items()):
             try:
@@ -459,15 +746,39 @@ class SignalWardenLive:
                     df_atr = self.fetch_ohlcv(symbol, '1h', 50)
                     if not df_atr.empty:
                         df_atr = add_indicators(df_atr, atr_p=14)
-                        pos['atr'] = float(df_atr.iloc[-1]['atr'])
-                        pos['sl_initial'] = pos['entry'] - (self.sl_atr_mult * pos['atr']) if pos['side'] == 'LONG' else pos['entry'] + (self.sl_atr_mult * pos['atr'])
-                        pos['sl_current'] = pos['sl_initial']
+                        calculated_atr = float(df_atr.iloc[-1]['atr'])
+                        # Защита от микроубытков: минимальный ATR
+                        min_atr = pos['entry'] * 0.008  # 0.8% от цены
+                        pos['atr'] = max(calculated_atr, min_atr)
+                        
+                        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: НЕ сбрасываем sl_current если он уже установлен!
+                        # Это уничтожает весь трейлинг!
+                        if 'sl_initial' not in pos or pos['sl_initial'] is None:
+                            pos['sl_initial'] = pos['entry'] - (self.sl_atr_mult * pos['atr']) if pos['side'] == 'LONG' else pos['entry'] + (self.sl_atr_mult * pos['atr'])
+                        
+                        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Сохраняем текущий SL если он лучше начального
+                        if 'sl_current' not in pos or pos['sl_current'] is None:
+                            pos['sl_current'] = pos['sl_initial']
+                        else:
+                            # Проверяем, что текущий SL не хуже начального
+                            if pos['side'] == 'LONG':
+                                # Для лонгов: sl_current должен быть >= sl_initial (выше = лучше)
+                                if pos['sl_current'] < pos['sl_initial']:
+                                    logger.warning(f"⚠️ {symbol}: Текущий SL хуже начального, восстанавливаем: {pos['sl_current']:.6f} → {pos['sl_initial']:.6f}")
+                                    pos['sl_current'] = pos['sl_initial']
+                            else:  # SHORT
+                                # Для шортов: sl_current должен быть <= sl_initial (ниже = лучше)
+                                if pos['sl_current'] > pos['sl_initial']:
+                                    logger.warning(f"⚠️ {symbol}: Текущий SL хуже начального, восстанавливаем: {pos['sl_current']:.6f} → {pos['sl_initial']:.6f}")
+                                    pos['sl_current'] = pos['sl_initial']
+                        
+                        logger.debug(f"📊 {symbol}: ATR установлен {pos['atr']:.6f}, SL initial: {pos['sl_initial']:.6f}, current: {pos['sl_current']:.6f}")
                 
                 if pos['atr'] is None:  # Still None, skip
                     continue
                 
-                # Update trailing logic using new PnL-based system
-                from ..core.trailing import update_trailing_pnl_based
+                # Update trailing logic using PnL-ONLY system (простая система по уровням!)
+                from ..core.trailing_pnl_only import update_trailing_pnl_only
                 from ..core.types import Position, Side
                 
                 # Convert to Position object
@@ -475,78 +786,96 @@ class SignalWardenLive:
                     side=Side.LONG if pos['side'] == 'LONG' else Side.SHORT,
                     entry=pos['entry'],
                     sl=pos['sl_current'] if pos['sl_current'] else pos['sl_initial'],
-                    sl_initial=pos['sl_initial'],
                     qty=pos['qty'],
                     remaining_qty=pos['qty'],
-                    r_per_unit=pos['atr'] * self.sl_atr_mult
+                    r_per_unit=pos['atr'] * self.sl_atr_mult,
+                    atr=pos['atr'] if pos['atr'] else 0.0,
+                    sl_initial=pos['sl_initial']
                 )
                 
                 # Add peak_pnl_usdt tracking to Position object
                 position.peak_pnl_usdt = pos.get('peak_pnl_usdt', 0.0)
                 
-                # Use new PnL-based trailing system
-                updated_pos = update_trailing_pnl_based(
-                    position, 
-                    current_price,
-                    real_pnl,  # Current PnL in USDT from Binance
-                    self.trailing
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Используем расчетный PnL если биржевый недоступен
+                # Не блокируем трейлинг при PnL <= 0, используем расчетный PnL как fallback
+                effective_pnl = real_pnl if real_pnl != 0 else calculated_pnl
+                
+                # Обновляем peak_pnl_usdt если текущий PnL больше
+                if effective_pnl > position.peak_pnl_usdt:
+                    position.peak_pnl_usdt = effective_pnl
+                    pos['peak_pnl_usdt'] = effective_pnl
+                    logger.debug(f"📈 {symbol}: Новый пик PnL: ${effective_pnl:.4f}")
+                
+                # Трейлинг работает даже при небольшом убытке для защиты минимальной прибыли
+                logger.debug(f"📊 {symbol}: Трейлинг PnL check - Real: {real_pnl:.4f}, Calculated: {calculated_pnl:.4f}, Effective: {effective_pnl:.4f}")
+                
+                # R-based трейлинг имеет свою логику активации внутри функции
+                
+                # Use PnL-ONLY trailing system (простая система по уровням!)
+                updated_pos = update_trailing_pnl_only(
+                    position,
+                    current_price,  # hi
+                    current_price,  # lo (используем текущую цену для обеих)
+                    pos['atr'],     # ATR (не используется в PnL-only, но нужен для совместимости)
+                    self.trailing   # TrailingConfigPnLOnly с PnL-уровнями
                 )
                 
-                # УЛУЧШЕННОЕ ЛОГИРОВАНИЕ для диагностики активации трейлинга
-                if real_pnl >= self.trailing.activate_pnl_usdt:
-                    # Проверяем что трейлинг действительно должен был обновиться
-                    if not hasattr(updated_pos, 'trailing_debug') or not updated_pos.trailing_debug.get('sl_updated', False):
-                        # Дополнительная проверка - возможно SL уже оптимален
-                        debug_info = getattr(updated_pos, 'trailing_debug', {})
-                        reason = debug_info.get('reason', 'unknown')
-                        
-                        if 'current_sl' in reason:
-                            # SL уже оптимален, не нужно предупреждение
-                            logger.debug(f"📊 {symbol}: PnL {real_pnl:.4f}, SL уже оптимален ({reason})")
-                        else:
-                            logger.warning(f"⚠️ {symbol}: PnL {real_pnl:.4f} >= {self.trailing.activate_pnl_usdt} но трейлинг не обновил SL!")
-                            if debug_info:
-                                logger.debug(f"🔍 {symbol} Debug: {debug_info}")
-                elif real_pnl > 0.05:  # Близко к активации
-                    logger.debug(f"📊 {symbol}: PnL {real_pnl:.4f} близко к активации ({self.trailing.activate_pnl_usdt})")
-                elif real_pnl < -0.05:  # Позиция в убытке
-                    logger.debug(f"📉 {symbol}: PnL {real_pnl:.4f} в убытке, трейлинг неактивен")
+                # УЛУЧШЕННОЕ ЛОГИРОВАНИЕ для диагностики PnL-ONLY трейлинга
+                debug_info = getattr(updated_pos, 'trailing_debug', {})
+                level = debug_info.get('level', 'unknown')
+                keep_pct = debug_info.get('keep_pct', 0)
                 
-                # CRITICAL: Only improve SL, never degrade it
-                # Add extra safety checks to prevent any SL degradation
+                if level == 'INACTIVE':
+                    logger.debug(f"📊 {symbol}: PnL-трейлинг не активен (PnL: {real_pnl:.4f} < ${self.trailing.level_1_pnl})")
+                elif debug_info.get('sl_updated', False):
+                    peak_pnl = debug_info.get('peak_pnl', 0)
+                    target_profit = debug_info.get('target_profit', 0)
+                    protection_applied = debug_info.get('protection_applied', False)
+                    protected_sl = debug_info.get('protected_sl', 0)
+                    pnl_sl = debug_info.get('pnl_sl', 0)
+                    
+                    if level == 'INACTIVE' and protection_applied:
+                        logger.info(f"🛡️ {symbol}: БАЗОВАЯ ЗАЩИТА активирована! SL: ${old_sl:.6f} → ${protected_sl:.6f} (мин. $0.03)")
+                    elif protection_applied:
+                        logger.info(f"🛡️ {symbol}: PnL-трейлинг с ЗАЩИТОЙ - Уровень: {level}, Peak PnL: ${peak_pnl:.4f}, Сохранить: {keep_pct*100:.0f}% (${target_profit:.4f})")
+                        logger.info(f"🛡️ {symbol}: Защита активирована! SL: ${pnl_sl:.6f} → ${protected_sl:.6f} (мин. $0.03)")
+                    else:
+                        logger.info(f"📊 {symbol}: PnL-трейлинг активен - Уровень: {level}, Peak PnL: ${peak_pnl:.4f}, Сохранить: {keep_pct*100:.0f}% (${target_profit:.4f})")
+                elif real_pnl > 0:
+                    logger.debug(f"📊 {symbol}: PnL-трейлинг PnL=${real_pnl:.4f}, SL без изменений")
+                
+                # КРИТИЧЕСКОЕ ПРАВИЛО: Стоп-лоссы могут ТОЛЬКО УЛУЧШАТЬСЯ!
+                # Никаких обновлений без реального улучшения
                 should_update = False
                 old_sl = pos['sl_current']
                 new_sl = updated_pos.sl
                 
+                # Минимальное улучшение для обновления (0.0001% от entry цены)
+                min_improvement = pos['entry'] * 0.000001
+                
                 if pos['side'] == 'LONG':
-                    # For longs: new SL must be higher (better protection)
-                    if new_sl > old_sl:
-                        # Additional safety: ensure new SL provides minimum profit
-                        min_required_pnl = 0.05  # Minimum 0.05 USDT profit
+                    # Для лонгов: новый SL должен быть ЗНАЧИТЕЛЬНО выше (лучше)
+                    improvement = new_sl - old_sl
+                    if improvement > min_improvement:
+                        should_update = True
                         projected_pnl = (new_sl - pos['entry']) * pos['qty']
-                        
-                        if projected_pnl >= min_required_pnl:
-                            should_update = True
-                            logger.debug(f"📊 {symbol}: SL improvement: {old_sl:.6f} → {new_sl:.6f}, projected profit: ${projected_pnl:.3f}")
-                        else:
-                            logger.warning(f"⚠️ {symbol}: New SL {new_sl:.6f} would give only ${projected_pnl:.3f} profit (< ${min_required_pnl:.2f})")
-                    elif new_sl < old_sl:
-                        logger.error(f"❌ {symbol}: CRITICAL - Trailing tried to WORSEN SL: {old_sl:.6f} → {new_sl:.6f}!")
+                        logger.info(f"✅ {symbol}: SL УЛУЧШЕНИЕ для LONG: {old_sl:.6f} → {new_sl:.6f} (+{improvement:.6f}, прибыль: ${projected_pnl:.3f})")
+                    elif improvement < -min_improvement:
+                        logger.error(f"❌ {symbol}: КРИТИЧНО - Трейлинг пытается УХУДШИТЬ SL для LONG: {old_sl:.6f} → {new_sl:.6f} ({improvement:.6f})!")
+                    else:
+                        logger.debug(f"📊 {symbol}: SL изменение для LONG слишком мало: {improvement:.8f}, пропускаем")
                         
                 elif pos['side'] == 'SHORT':
-                    # For shorts: new SL must be lower (better protection)  
-                    if new_sl < old_sl:
-                        # Additional safety: ensure new SL provides minimum profit
-                        min_required_pnl = 0.05  # Minimum 0.05 USDT profit
+                    # Для шортов: новый SL должен быть ЗНАЧИТЕЛЬНО ниже (лучше)
+                    improvement = old_sl - new_sl  # Для шортов улучшение = уменьшение SL
+                    if improvement > min_improvement:
+                        should_update = True
                         projected_pnl = (pos['entry'] - new_sl) * pos['qty']
-                        
-                        if projected_pnl >= min_required_pnl:
-                            should_update = True
-                            logger.debug(f"📊 {symbol}: SL improvement: {old_sl:.6f} → {new_sl:.6f}, projected profit: ${projected_pnl:.3f}")
-                        else:
-                            logger.warning(f"⚠️ {symbol}: New SL {new_sl:.6f} would give only ${projected_pnl:.3f} profit (< ${min_required_pnl:.2f})")
-                    elif new_sl > old_sl:
-                        logger.error(f"❌ {symbol}: CRITICAL - Trailing tried to WORSEN SL: {old_sl:.6f} → {new_sl:.6f}!")
+                        logger.info(f"✅ {symbol}: SL УЛУЧШЕНИЕ для SHORT: {old_sl:.6f} → {new_sl:.6f} (-{improvement:.6f}, прибыль: ${projected_pnl:.3f})")
+                    elif improvement < -min_improvement:
+                        logger.error(f"❌ {symbol}: КРИТИЧНО - Трейлинг пытается УХУДШИТЬ SL для SHORT: {old_sl:.6f} → {new_sl:.6f} (+{-improvement:.6f})!")
+                    else:
+                        logger.debug(f"📊 {symbol}: SL изменение для SHORT слишком мало: {-improvement:.8f}, пропускаем")
                     
                 if should_update:
                     old_sl = pos['sl_current']
@@ -569,7 +898,7 @@ class SignalWardenLive:
                     debug_info = getattr(updated_pos, 'trailing_debug', {})
                     level_info = f" ({debug_info.get('level', 'L?')}: {debug_info.get('keep_pct', 0)*100:.0f}%)"
                     
-                    logger.info(f"{direction} {symbol}: Trailing SL {old_sl:.6f} → {updated_pos.sl:.6f}, PnL: {real_pnl:.2f} USDT{level_info}")
+                    logger.info(f"{direction} {symbol}: PnL-Trailing SL {old_sl:.6f} → {updated_pos.sl:.6f}, PnL: {real_pnl:.2f} USDT{level_info}")
                     
                     # Additional debug logging
                     if debug_info:
@@ -639,11 +968,21 @@ class SignalWardenLive:
                 params={'reduceOnly': True}
             )
             
-            # Calculate PnL
+            # Calculate PnL (including commissions)
             if pos['side'] == 'LONG':
-                pnl_usdt = (exit_price - pos['entry']) * pos['qty']
+                pnl_before_fees = (exit_price - pos['entry']) * pos['qty']
             else:
-                pnl_usdt = (pos['entry'] - exit_price) * pos['qty']
+                pnl_before_fees = (pos['entry'] - exit_price) * pos['qty']
+            
+            # Calculate total commissions (entry + exit)
+            position_value = pos['entry'] * pos['qty']
+            taker_fee = 0.0005  # 0.05% taker fee
+            total_commission = position_value * taker_fee * 2  # entry + exit
+            
+            # PnL after commissions
+            pnl_usdt = pnl_before_fees - total_commission
+            
+            logger.info(f"💰 {symbol}: PnL before fees: {pnl_before_fees:.6f} USDT, Commission: {total_commission:.6f} USDT, Net PnL: {pnl_usdt:.6f} USDT")
                 
             logger.info(f"🔚 {symbol}: Position closed @ {exit_price:.6f} ({reason}), PnL: {pnl_usdt:.2f} USDT")
             
@@ -670,7 +1009,8 @@ class SignalWardenLive:
             
         logger.debug(f"🔍 Checking {len(self.active_positions)} active positions...")
         
-        positions_to_close = []
+        # ТОЛЬКО МОНИТОРИНГ - закрытие происходит через stop_market ордера на бирже
+        positions_to_close = []  # Список позиций для удаления из трекинга
         
         for symbol, pos in list(self.active_positions.items()):
             try:
@@ -707,44 +1047,86 @@ class SignalWardenLive:
                     logger.warning(f"⚠️ {symbol}: No stop loss price set!")
                     continue
                 
-                should_close = False
+                # ТОЛЬКО МОНИТОРИНГ - НЕТ ПРОГРАММНОГО ЗАКРЫТИЯ!
+                # Полагаемся исключительно на stop_market ордера на бирже
                 
+                sl_distance_pct = 0
                 if pos['side'] == 'LONG':
-                    # For longs: close if current price <= stop loss
+                    sl_distance_pct = ((current_price - sl_price) / current_price) * 100
                     if current_price <= sl_price:
-                        should_close = True
-                        logger.warning(f"🚨 {symbol} LONG SL HIT: Price ${current_price:.6f} <= SL ${sl_price:.6f}")
+                        logger.warning(f"🚨 {symbol} LONG SL ZONE: Price ${current_price:.6f} <= SL ${sl_price:.6f} - ожидаем исполнения stop_market ордера")
                 else:
-                    # For shorts: close if current price >= stop loss
+                    sl_distance_pct = ((sl_price - current_price) / current_price) * 100  
                     if current_price >= sl_price:
-                        should_close = True
-                        logger.warning(f"🚨 {symbol} SHORT SL HIT: Price ${current_price:.6f} >= SL ${sl_price:.6f}")
+                        logger.warning(f"🚨 {symbol} SHORT SL ZONE: Price ${current_price:.6f} >= SL ${sl_price:.6f} - ожидаем исполнения stop_market ордера")
                 
-                if should_close:
-                    logger.error(f"💥 {symbol}: STOP LOSS TRIGGERED! Closing position immediately...")
-                    self.close_position(symbol, current_price, "STOP_LOSS_HIT")
-                    positions_to_close.append(symbol)
-                else:
-                    # Log position status
-                    pnl = pos.get('unrealized_pnl', 0)
-                    direction = "🟢" if pos['side'] == 'LONG' else "🔴"
-                    logger.debug(f"{direction} {symbol}: Price ${current_price:.6f}, SL ${sl_price:.6f}, PnL: {pnl:.2f} USDT")
+                # Log position status
+                pnl = pos.get('unrealized_pnl', 0)
+                direction = "🟢" if pos['side'] == 'LONG' else "🔴"
+                logger.debug(f"{direction} {symbol}: Price ${current_price:.6f}, SL ${sl_price:.6f} ({sl_distance_pct:+.2f}%), PnL: {pnl:.2f} USDT")
                     
             except Exception as e:
                 logger.error(f"❌ Failed to check position {symbol}: {e}")
         
-        # Clean up closed positions
+        # Очистка закрытых позиций из трекинга
         for symbol in positions_to_close:
             if symbol in self.active_positions:
-                del self.active_positions[symbol]
-                # Clean up saved position state
+                logger.info(f"🗑️ Removing closed position {symbol} from tracking")
                 self.cleanup_position_state(symbol)
-                self.storage.update_symbol(symbol, {'active_position': None})
+        
+        # Позиции закрываются только через stop_market ордера на бирже
     
     def update_sliding_stop_loss(self, symbol: str, pos: Dict[str, Any]):
         """Update sliding market stop loss order on exchange"""
         if self.paper_mode:
             return
+        
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: СТРОГАЯ проверка необходимости обновления SL
+        # Обновляем ТОЛЬКО если SL действительно УЛУЧШАЕТСЯ
+        current_sl = pos['sl_current']
+        last_updated_sl = pos.get('last_updated_sl', 0)
+        
+        # Проверяем минимальное изменение SL (0.0001% от цены)
+        min_sl_change = pos['entry'] * 0.000001  # 0.0001% от entry цены
+        sl_change = abs(current_sl - last_updated_sl)
+        
+        if sl_change < min_sl_change:
+            logger.debug(f"📊 {symbol}: SL изменение слишком мало ({sl_change:.8f} < {min_sl_change:.8f}), пропускаем обновление")
+            return
+        
+        # СТРОГАЯ ПРОВЕРКА: SL должен только УЛУЧШАТЬСЯ, никогда не ухудшаться
+        if last_updated_sl != 0:  # Если есть предыдущий SL
+            if pos['side'] == 'LONG':
+                # Для лонгов: новый SL должен быть ВЫШЕ (лучше)
+                if current_sl <= last_updated_sl:
+                    logger.debug(f"📊 {symbol}: SL не улучшился для LONG ({current_sl:.6f} <= {last_updated_sl:.6f}), пропускаем")
+                    return
+            else:  # SHORT
+                # Для шортов: новый SL должен быть НИЖЕ (лучше)
+                if current_sl >= last_updated_sl:
+                    logger.debug(f"📊 {symbol}: SL не улучшился для SHORT ({current_sl:.6f} >= {last_updated_sl:.6f}), пропускаем")
+                    return
+        
+        # ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: Если SL точно такой же как last_updated_sl - НЕ ОБНОВЛЯТЬ
+        if abs(current_sl - last_updated_sl) < 0.000001:
+            logger.debug(f"📊 {symbol}: SL идентичен предыдущему ({current_sl:.6f} = {last_updated_sl:.6f}), пропускаем")
+            return
+        
+        # Дополнительная проверка против начального SL
+        sl_initial = pos.get('sl_initial', 0)
+        if sl_initial != 0:
+            if pos['side'] == 'LONG':
+                # Для лонгов: текущий SL должен быть >= начального
+                if current_sl < sl_initial:
+                    logger.warning(f"⚠️ {symbol}: SL хуже начального для LONG! {current_sl:.6f} < {sl_initial:.6f}, блокируем обновление")
+                    return
+            else:  # SHORT
+                # Для шортов: текущий SL должен быть <= начального  
+                if current_sl > sl_initial:
+                    logger.warning(f"⚠️ {symbol}: SL хуже начального для SHORT! {current_sl:.6f} > {sl_initial:.6f}, блокируем обновление")
+                    return
+            
+        logger.info(f"🔄 {symbol}: УЛУЧШАЕМ SL ордер: {last_updated_sl:.6f} → {current_sl:.6f} (✅ подтверждено улучшение)")
             
         try:
             ccxt_sym = self.ccxt_symbol(symbol)
@@ -782,28 +1164,41 @@ class SignalWardenLive:
             except Exception as orders_error:
                 logger.warning(f"⚠️ Could not fetch open orders for {symbol}: {orders_error}")
             
-            # STEP 1: Cancel ALL old SL orders immediately to prevent race condition
-            cancelled_orders = []
-            if old_sl_orders:
-                logger.info(f"🚫 {symbol}: Cancelling {len(old_sl_orders)} old SL orders to prevent race condition")
-                for old_order in old_sl_orders:
-                    try:
-                        self.exchange.cancel_order(old_order['id'], ccxt_sym)
-                        cancelled_orders.append(old_order)
-                        logger.debug(f"🚫 {symbol}: Cancelled old SL order {old_order['id']} @ {old_order.get('stopPrice')}")
-                        time.sleep(0.05)  # Small delay between cancellations
-                    except Exception as cancel_error:
-                        logger.warning(f"⚠️ {symbol}: Could not cancel old SL order {old_order['id']}: {cancel_error}")
-                
-                # Wait a bit to ensure cancellations are processed
-                time.sleep(0.2)
+            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: БЕЗОПАСНАЯ ЗАМЕНА SL ОРДЕРА
+            # НИКОГДА НЕ ОСТАВЛЯЕМ ПОЗИЦИЮ БЕЗ ЗАЩИТЫ!
             
-            # STEP 2: Create NEW stop loss order
+            # STEP 1: Проверяем, что новый SL не сработает немедленно
+            current_price = None
+            try:
+                ticker = self.exchange.fetch_ticker(ccxt_sym)
+                current_price = float(ticker['last'])
+            except Exception as price_error:
+                logger.warning(f"⚠️ {symbol}: Could not fetch current price for SL validation: {price_error}")
+                return  # Не обновляем SL если не можем получить цену
+            
+            # Проверяем безопасность нового SL уровня
+            new_sl_price = pos['sl_current']
+            price_buffer = current_price * 0.001  # 0.1% буфер от текущей цены
+            
+            if pos['side'] == 'LONG':
+                # Для лонгов: SL должен быть ниже текущей цены с буфером
+                if new_sl_price >= (current_price - price_buffer):
+                    logger.warning(f"⚠️ {symbol}: NEW SL TOO CLOSE TO CURRENT PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f}, Buffer: {price_buffer:.6f}")
+                    logger.warning(f"⚠️ {symbol}: Skipping SL update to prevent immediate trigger")
+                    return
+            else:  # SHORT
+                # Для шортов: SL должен быть выше текущей цены с буфером
+                if new_sl_price <= (current_price + price_buffer):
+                    logger.warning(f"⚠️ {symbol}: NEW SL TOO CLOSE TO CURRENT PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f}, Buffer: {price_buffer:.6f}")
+                    logger.warning(f"⚠️ {symbol}: Skipping SL update to prevent immediate trigger")
+                    return
+            
+            # STEP 2: Создаем НОВЫЙ SL ордер ПЕРВЫМ (позиция остается защищенной)
             sl_side = 'sell' if pos['side'] == 'LONG' else 'buy'
             new_sl_created = False
             new_sl_order = None
             
-            max_retries = 5  # Increased retries
+            max_retries = 3  # Уменьшили количество попыток
             for attempt in range(max_retries):
                 try:
                     # Determine order parameters based on type
@@ -816,7 +1211,7 @@ class SignalWardenLive:
                             pos['qty'],
                             None,  # Нет цены исполнения для stop_market
                             params={
-                                'stopPrice': pos['sl_current'],
+                                'stopPrice': new_sl_price,
                                 'reduceOnly': True,
                                 'timeInForce': 'GTC'
                             }
@@ -825,35 +1220,88 @@ class SignalWardenLive:
                         # Лимитный стоп-лосс (лимитный ордер после триггера)
                         new_sl_order = self.exchange.create_order(
                             ccxt_sym,
-                            'stop',
+                            self.sl_order_type,  # Используем из конфигурации!
                             sl_side,
                             pos['qty'],
-                            pos['sl_current'],  # Цена исполнения для лимитного стопа
+                            new_sl_price if self.sl_order_type == 'stop' else None,  # Цена только для лимитного
                             params={
-                                'stopPrice': pos['sl_current'],
+                                'stopPrice': new_sl_price,
                                 'reduceOnly': True,
                                 'timeInForce': 'GTC'
                             }
                         )
                     new_sl_created = True
-                    logger.info(f"✅ {symbol}: New SL order created @ {pos['sl_current']:.6f} (ID: {new_sl_order['id']})")
+                    logger.info(f"✅ {symbol}: New SL order created @ {new_sl_price:.6f} (ID: {new_sl_order['id']})")
                     break
                 except Exception as e:
-                    logger.warning(f"⚠️ {symbol}: SL creation attempt {attempt+1}/{max_retries} failed: {e}")
-                    if attempt < max_retries - 1:
-                        time.sleep(0.5)  # Wait before retry
+                    error_msg = str(e).lower()
+                    if "order would immediately trigger" in error_msg or "-2021" in str(e):
+                        logger.error(f"❌ {symbol}: NEW SL WOULD TRIGGER IMMEDIATELY! Current: {current_price:.6f}, New SL: {new_sl_price:.6f}")
+                        logger.error(f"❌ {symbol}: This should not happen after our price checks! Aborting SL update.")
+                        return  # Прерываем обновление SL
+                    else:
+                        logger.warning(f"⚠️ {symbol}: SL creation attempt {attempt+1}/{max_retries} failed: {e}")
+                        if attempt < max_retries - 1:
+                            time.sleep(0.3)  # Короткая пауза
             
-            # CRITICAL: If new SL creation failed, try to restore old ones
+            # Если не удалось создать новый SL - НЕ ТРОГАЕМ СТАРЫЕ!
             if not new_sl_created:
                 logger.error(f"❌ {symbol}: CRITICAL - Could not create new SL order after {max_retries} attempts!")
-                logger.error(f"❌ {symbol}: Position may be UNPROTECTED! Manual intervention required!")
-                
-                # Try to restore at least one old SL order if we cancelled any
-                if cancelled_orders:
-                    logger.warning(f"🛡️ {symbol}: Attempting to restore protection with old SL level...")
+                logger.error(f"❌ {symbol}: KEEPING OLD SL ORDERS FOR PROTECTION! Manual intervention may be required.")
+                return  # Оставляем старые SL ордера для защиты
+            
+            # STEP 3: ТОЛЬКО ПОСЛЕ успешного создания нового SL - отменяем старые
+            cancelled_orders = []
+            if old_sl_orders:
+                logger.info(f"🚫 {symbol}: Cancelling {len(old_sl_orders)} old SL orders (new SL is active)")
+                for old_order in old_sl_orders:
                     try:
-                        # Use the last cancelled order's price as emergency SL
-                        emergency_sl = cancelled_orders[-1].get('stopPrice', pos['sl_current'])
+                        self.exchange.cancel_order(old_order['id'], ccxt_sym)
+                        cancelled_orders.append(old_order)
+                        logger.debug(f"🚫 {symbol}: Cancelled old SL order {old_order['id']} @ {old_order.get('stopPrice')}")
+                        time.sleep(0.05)  # Small delay between cancellations
+                    except Exception as cancel_error:
+                        logger.warning(f"⚠️ {symbol}: Could not cancel old SL order {old_order['id']}: {cancel_error}")
+                        # Не критично - у нас есть новый SL
+            
+            # STEP 4: Финализируем обновление
+            pos['last_updated_sl'] = new_sl_price
+            pos['sl_order_id'] = new_sl_order['id'] if new_sl_order else None
+            
+            logger.info(f"🛡️ {symbol}: SL SAFELY UPDATED! Old cancelled: {len(cancelled_orders)}, New active: {new_sl_order['id']}")
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update sliding SL for {symbol}: {e}")
+    
+    def verify_all_positions_have_sl_protection(self):
+        """Критическая проверка: все позиции должны иметь активные SL ордера"""
+        if self.paper_mode:
+            return
+        
+        unprotected_positions = []
+        
+        for symbol, pos in self.active_positions.items():
+            try:
+                ccxt_sym = self.ccxt_symbol(symbol)
+                
+                # Проверяем наличие SL ордеров на бирже
+                open_orders = self.exchange.fetch_open_orders(ccxt_sym)
+                has_sl_order = False
+                
+                for order in open_orders:
+                    if order['type'] in ['stop_market', 'stop'] and order['info'].get('reduceOnly'):
+                        has_sl_order = True
+                        break
+                
+                if not has_sl_order:
+                    unprotected_positions.append(symbol)
+                    logger.error(f"❌ {symbol}: CRITICAL - ПОЗИЦИЯ БЕЗ SL ОРДЕРА! Entry: {pos['entry']:.6f}, Current SL: {pos.get('sl_current', 'N/A')}")
+                    
+                    # Пытаемся создать экстренный SL
+                    try:
+                        sl_side = 'sell' if pos['side'] == 'LONG' else 'buy'
+                        emergency_sl = pos.get('sl_current', pos.get('sl_initial', pos['entry'] * (0.97 if pos['side'] == 'LONG' else 1.03)))
+                        
                         emergency_order = self.exchange.create_order(
                             ccxt_sym,
                             'stop_market',
@@ -866,19 +1314,22 @@ class SignalWardenLive:
                                 'timeInForce': 'GTC'
                             }
                         )
-                        logger.warning(f"🛡️ {symbol}: Emergency SL created @ {emergency_sl} (ID: {emergency_order['id']})")
+                        
+                        pos['sl_order_id'] = emergency_order['id']
+                        pos['last_updated_sl'] = emergency_sl
+                        logger.warning(f"🛡️ {symbol}: EMERGENCY SL создан @ {emergency_sl:.6f} (ID: {emergency_order['id']})")
+                        
                     except Exception as emergency_error:
-                        logger.error(f"❌ {symbol}: Emergency SL creation also failed: {emergency_error}")
-                        logger.error(f"❌ {symbol}: POSITION IS COMPLETELY UNPROTECTED!")
-                
-                return  # Don't proceed if we couldn't create new SL
-            
-            # Update position with new SL order ID
-            if new_sl_created and new_sl_order:
-                pos['sl_order_id'] = new_sl_order['id']
-            
-        except Exception as e:
-            logger.error(f"❌ Failed to update sliding SL for {symbol}: {e}")
+                        logger.error(f"❌ {symbol}: НЕ УДАЛОСЬ СОЗДАТЬ EMERGENCY SL: {emergency_error}")
+                        logger.error(f"❌ {symbol}: ПОЗИЦИЯ ОСТАЕТСЯ ПОЛНОСТЬЮ НЕЗАЩИЩЕННОЙ!")
+                        
+            except Exception as check_error:
+                logger.warning(f"⚠️ Ошибка проверки SL для {symbol}: {check_error}")
+        
+        if unprotected_positions:
+            logger.error(f"❌ КРИТИЧНО: {len(unprotected_positions)} позиций без SL защиты: {unprotected_positions}")
+        else:
+            logger.debug(f"✅ Все {len(self.active_positions)} позиций имеют SL защиту")
         
     def ccxt_symbol(self, symbol: str) -> str:
         """Convert symbol format: ADA_USDT -> ADA/USDT:USDT"""
@@ -1136,7 +1587,9 @@ class SignalWardenLive:
                     for ts in df_15m['timestamp'].values:
                         mask = btc_gate['timestamp'] <= ts
                         if mask.any():
-                            idx = mask.idxmax()
+                            # ИСПРАВЛЕНИЕ: Найти последний True индекс вместо idxmax()
+                            true_indices = mask[mask].index
+                            idx = true_indices[-1]  # Последний True индекс
                             gate_15m_data.append({
                                 'timestamp': ts,
                                 'mkt_long_ok': btc_gate.iloc[idx]['mkt_long_ok'],
@@ -1217,7 +1670,21 @@ class SignalWardenLive:
             symbol = signal['symbol']
             side = signal['side']
             entry = signal['entry']
-            atr = signal['atr']
+            
+            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Принудительно пересчитываем ATR
+            try:
+                df = self.fetch_ohlcv(symbol, '1h', 50)
+                if not df.empty:
+                    from signalwarden_lite.core.features import add_indicators
+                    df = add_indicators(df, atr_p=14)
+                    atr = float(df.iloc[-1]['atr'])
+                    logger.info(f"🔄 {symbol}: ATR пересчитан: {atr:.6f} USDT")
+                else:
+                    atr = signal['atr']  # Fallback к сигналу
+                    logger.warning(f"⚠️ {symbol}: Нет данных для пересчета ATR, используем из сигнала: {atr:.6f}")
+            except Exception as e:
+                atr = signal['atr']  # Fallback к сигналу
+                logger.warning(f"⚠️ {symbol}: Ошибка пересчета ATR: {e}, используем из сигнала: {atr:.6f}")
             
             # Check if position already exists for this symbol
             if self.has_open_position(symbol):
@@ -1236,11 +1703,47 @@ class SignalWardenLive:
             position_value_usdt = self.margin_usdt  # 21 USDT notional exactly
             qty = position_value_usdt / entry
             
-            # Calculate stop loss
+            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Усиленная защита от микроубытков
+            # Увеличиваем минимальный ATR для гарантированной защиты
+            min_atr = entry * 0.008  # Минимум 0.8% от цены для защиты от микроубытков
+            effective_atr = max(atr, min_atr)
+            
             if side == 'LONG':
-                sl_price = entry - (self.sl_atr_mult * atr)
+                sl_price = entry - (self.sl_atr_mult * effective_atr)
             else:
-                sl_price = entry + (self.sl_atr_mult * atr)
+                sl_price = entry + (self.sl_atr_mult * effective_atr)
+            
+            # ПОДРОБНОЕ ЛОГИРОВАНИЕ для диагностики (анти-дрейф)
+            original_atr = atr
+            sl_distance_usdt = abs(sl_price - entry) * qty
+            sl_distance_pct = (abs(sl_price - entry) / entry) * 100
+            
+            # Логирование защиты от микроубытков
+            if effective_atr > original_atr:
+                logger.warning(f"🛡️ {symbol}: ATR защита активна! Оригинальный ATR {original_atr:.6f} → Эффективный ATR {effective_atr:.6f}")
+                logger.warning(f"🛡️ {symbol}: SL distance увеличена с {(original_atr*self.sl_atr_mult/entry)*100:.2f}% до {sl_distance_pct:.2f}%")
+            
+            logger.info(f"🎯 {symbol} {side} ENTRY ANALYSIS:")
+            logger.info(f"   📊 Entry: {entry:.6f}, Qty: {qty:.4f} ({position_value_usdt} USDT)")
+            logger.info(f"   📏 ATR: {atr:.6f} (ЧИСТЫЙ - как в успешном бэктесте!)")
+            logger.info(f"   🛡️ SL: {sl_price:.6f} (Distance: ${sl_distance_usdt:.4f})")
+            
+            # КРИТИЧЕСКОЕ ЛОГИРОВАНИЕ для диагностики
+            sl_distance_pct = (abs(sl_price - entry) / entry) * 100
+            logger.warning(f"🚨 {symbol}: КРИТИЧЕСКАЯ ДИАГНОСТИКА:")
+            logger.warning(f"   • Оригинальный ATR: {original_atr:.6f} USDT")
+            logger.warning(f"   • Эффективный ATR: {effective_atr:.6f} USDT")
+            logger.warning(f"   • SL distance: {sl_distance_pct:.2f}% от цены")
+            logger.warning(f"   • SL distance USDT: ${sl_distance_usdt:.4f}")
+            logger.warning(f"   • Ожидаемый минимум: 1.2% = ${entry * 0.012:.4f}")
+            
+            if sl_distance_pct < 1.0:
+                logger.error(f"❌ {symbol}: SL СЛИШКОМ БЛИЗКО! {sl_distance_pct:.2f}% < 1.0%")
+            elif sl_distance_pct < 1.5:
+                logger.warning(f"⚠️ {symbol}: SL близко к минимуму: {sl_distance_pct:.2f}%")
+            else:
+                logger.info(f"✅ {symbol}: SL нормальный: {sl_distance_pct:.2f}%")
+            logger.info(f"   💸 Entry Fee: maker_first (низкие комиссии)")
             
             ccxt_sym = self.ccxt_symbol(symbol)
             
@@ -1276,10 +1779,10 @@ class SignalWardenLive:
                     # Лимитный стоп-лосс (лимитный ордер после триггера)
                     sl_order = self.exchange.create_order(
                         ccxt_sym,
-                        'stop',
+                        self.sl_order_type,  # Используем из конфигурации!
                         sl_side,
                         qty,
-                        sl_price,  # Цена исполнения для лимитного стопа
+                        sl_price if self.sl_order_type == 'stop' else None,  # Цена только для лимитного
                         params={
                             'stopPrice': sl_price,
                             'reduceOnly': True,
@@ -1288,9 +1791,42 @@ class SignalWardenLive:
                     )
                 sl_order_id = sl_order['id']
                 logger.info(f"🛡️ {symbol}: Stop-loss created @ {sl_price:.6f} (Order ID: {sl_order_id})")
+                
+                # КРИТИЧЕСКОЕ ЛОГИРОВАНИЕ stop-market ордера
+                logger.warning(f"🚨 {symbol}: STOP-MARKET ОРДЕР СОЗДАН:")
+                logger.warning(f"   • Order ID: {sl_order_id}")
+                logger.warning(f"   • Stop Price: {sl_price:.6f} USDT")
+                logger.warning(f"   • Entry Price: {entry:.6f} USDT")
+                logger.warning(f"   • SL Distance: {abs(sl_price - entry):.6f} USDT")
+                logger.warning(f"   • SL Distance %: {abs(sl_price - entry)/entry*100:.2f}%")
+                logger.warning(f"   • Qty: {qty:.4f}")
+                logger.warning(f"   • Side: {sl_side}")
+                logger.warning(f"   • Type: {self.sl_order_type}")
             except Exception as e:
                 logger.error(f"❌ {symbol}: Failed to create stop-loss: {e}")
                 sl_order_id = None
+            
+            # КРИТИЧЕСКАЯ ПРОВЕРКА: Позиция НЕ добавляется без SL ордера!
+            if sl_order_id is None:
+                logger.error(f"❌ {symbol}: КРИТИЧНО - НЕ УДАЛОСЬ СОЗДАТЬ SL ОРДЕР!")
+                logger.error(f"❌ {symbol}: ПОЗИЦИЯ НЕ БУДЕТ ДОБАВЛЕНА В ТРЕЙЛИНГ!")
+                
+                # Пытаемся закрыть позицию на бирже чтобы не оставлять ее без защиты
+                try:
+                    close_side = 'sell' if side == 'LONG' else 'buy'
+                    close_order = self.exchange.create_market_order(
+                        ccxt_sym,
+                        close_side,
+                        qty,
+                        None,
+                        params={'reduceOnly': True}
+                    )
+                    logger.warning(f"🛡️ {symbol}: Позиция закрыта для безопасности (ID: {close_order['id']})")
+                    return f"❌ {symbol}: Позиция закрыта - не удалось создать SL"
+                except Exception as close_error:
+                    logger.error(f"❌ {symbol}: Не удалось закрыть незащищенную позицию: {close_error}")
+                    logger.error(f"❌ {symbol}: ПОЗИЦИЯ ОСТАЛАСЬ НЕЗАЩИЩЕННОЙ НА БИРЖЕ!")
+                    return f"❌ {symbol}: КРИТИЧНО - позиция без SL осталась на бирже!"
             
             # Track position
             position_info = {
@@ -1305,10 +1841,12 @@ class SignalWardenLive:
                 'order_id': order['id'],
                 'sl_order_id': sl_order_id,
                 'trailing_active': False,
-                'peak_pnl_usdt': 0.0  # Initialize peak PnL tracking
+                'peak_pnl_usdt': 0.0,  # Initialize peak PnL tracking
+                'last_updated_sl': sl_price  # Для предотвращения спама обновлений
             }
             
             self.active_positions[symbol] = position_info
+            logger.info(f"✅ {symbol}: Позиция добавлена в активные с SL защитой")
             
             # Save state
             self.storage.update_symbol(symbol, {
@@ -1340,6 +1878,15 @@ class SignalWardenLive:
         
         # CRITICAL: First check and manage active positions
         self.check_active_positions()
+        
+        # Periodic validation (every 10 cycles)
+        if hasattr(self, '_cycle_count'):
+            self._cycle_count += 1
+        else:
+            self._cycle_count = 1
+            
+        if self._cycle_count % 10 == 0:
+            self.run_periodic_validation()
         
         # Trailing is now handled by separate thread, no need to update here
         
@@ -1408,7 +1955,7 @@ class SignalWardenLive:
         logger.info(f"💰 Risk per trade: {self.margin_usdt} USDT notional ({self.margin_usdt/self.leverage:.1f} USDT margin)")
         logger.info(f"⚙️ MTF Strategy: 1h breakout + 15m LTF setups")
         logger.info(f"🛡️ Adaptive shorts with BTC filter enabled")
-        logger.info(f"🔄 PnL-based trailing: 0.10 USDT activation, 50%/60%/70%/80% levels")
+        logger.info(f"🔄 PnL-only trailing: ${self.trailing.level_1_pnl}→{self.trailing.level_1_keep_pct*100:.0f}%, ${self.trailing.level_2_pnl}→{self.trailing.level_2_keep_pct*100:.0f}%, ${self.trailing.level_3_pnl}→{self.trailing.level_3_keep_pct*100:.0f}%, ${self.trailing.level_4_pnl}→{self.trailing.level_4_keep_pct*100:.0f}%")
         
         # Load saved position states
         self.load_position_states()
@@ -1426,6 +1973,13 @@ class SignalWardenLive:
                 cycle_count += 1
                 
                 try:
+                    # Clear stale cache to prevent trading on outdated data
+                    self.clear_stale_cache()
+                    
+                    # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Синхронизация каждый цикл
+                    logger.info("🔄 Синхронизация с биржей каждый цикл...")
+                    self.force_cleanup_nonexistent_positions()
+                    
                     signals, trades = self.run_trading_cycle()
                     
                     # Sleep for 2 minutes between cycles
