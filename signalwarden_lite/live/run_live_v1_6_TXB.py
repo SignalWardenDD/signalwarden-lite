@@ -1251,10 +1251,16 @@ class SignalWardenLive:
                 if new_sl_price <= (current_price + price_buffer):
                     is_sl_safe = False
             
-            if not is_sl_safe:
-                logger.warning(f"⚠️ {symbol}: NEW SL TOO CLOSE TO CURRENT PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f}, Buffer: {price_buffer:.6f} ({buffer_name})")
-                logger.warning(f"⚠️ {symbol}: Skipping SL update to prevent immediate trigger")
+            if not is_sl_safe and not is_trailing_update:
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Блокируем только ПЕРВОНАЧАЛЬНЫЕ SL, НЕ трейлинг обновления
+                # Трейлинг должен ВСЕГДА обновляться для защиты минимальной прибыли!
+                logger.warning(f"⚠️ {symbol}: NEW INITIAL SL TOO CLOSE TO CURRENT PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f}, Buffer: {price_buffer:.6f}")
+                logger.warning(f"⚠️ {symbol}: Skipping INITIAL SL update to prevent immediate trigger")
                 return
+            elif not is_sl_safe and is_trailing_update:
+                # Для трейлинга: предупреждаем но НЕ блокируем (защита прибыли важнее)
+                logger.warning(f"🚨 {symbol}: TRAILING SL CLOSE TO PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f} - PROCEEDING (profit protection priority)")
+                logger.warning(f"🚨 {symbol}: Это может быть защита минимальной прибыли при движении против нас")
             
             # STEP 2: Создаем НОВЫЙ SL ордер ПЕРВЫМ (позиция остается защищенной)
             sl_side = 'sell' if pos['side'] == 'LONG' else 'buy'

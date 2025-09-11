@@ -1,5 +1,8 @@
 from dataclasses import dataclass
 from .types import Position, Side
+import logging
+
+logger = logging.getLogger(__name__)
 
 @dataclass
 class TrailingConfigPnLOnly:
@@ -86,6 +89,13 @@ def update_trailing_pnl_only(pos: Position, hi: float, lo: float, atr: float, cf
                 # Для LONG: выбираем более высокий SL (ближе к entry = лучше защита)
                 protected_sl = max(pnl_sl, min_sl)
                 
+                # КРИТИЧЕСКАЯ ПРОВЕРКА: SL ВСЕГДА должен гарантировать минимум $0.03
+                guaranteed_profit = (protected_sl - pos.entry) * pos.qty
+                if guaranteed_profit < 0.029:  # Небольшой буфер для округления
+                    # Принудительно устанавливаем SL для $0.03 прибыли
+                    protected_sl = pos.entry + (0.03 / pos.qty)
+                    logger.warning(f"🛡️ ПРИНУДИТЕЛЬНАЯ ЗАЩИТА $0.03: SL скорректирован с {pnl_sl:.6f} на {protected_sl:.6f}")
+                
                 old_sl = pos.sl  # Сохраняем старый SL
                 sl_updated = False
                 if protected_sl > pos.sl:
@@ -166,6 +176,13 @@ def update_trailing_pnl_only(pos: Position, hi: float, lo: float, atr: float, cf
                 # ЗАЩИТА: Используем минимальный из рассчитанного SL и максимального защитного SL
                 # Для SHORT: выбираем более низкий SL (ближе к entry = лучше защита)
                 protected_sl = min(pnl_sl, min_sl)
+                
+                # КРИТИЧЕСКАЯ ПРОВЕРКА: SL ВСЕГДА должен гарантировать минимум $0.03
+                guaranteed_profit = (pos.entry - protected_sl) * pos.qty
+                if guaranteed_profit < 0.029:  # Небольшой буфер для округления
+                    # Принудительно устанавливаем SL для $0.03 прибыли
+                    protected_sl = pos.entry - (0.03 / pos.qty)
+                    logger.warning(f"🛡️ ПРИНУДИТЕЛЬНАЯ ЗАЩИТА $0.03 (SHORT): SL скорректирован с {pnl_sl:.6f} на {protected_sl:.6f}")
                 
                 old_sl = pos.sl  # Сохраняем старый SL
                 sl_updated = False
