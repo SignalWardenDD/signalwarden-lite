@@ -715,8 +715,15 @@ class SignalWardenLive:
             logger.debug("📊 Нет активных позиций для трейлинга")
             return
         
-        # КРИТИЧЕСКАЯ ПРОВЕРКА БЕЗОПАСНОСТИ: Все позиции должны иметь активные SL ордера
-        self.verify_all_positions_have_sl_protection()
+        # КРИТИЧЕСКАЯ ПРОВЕРКА БЕЗОПАСНОСТИ: Проверяем реже (каждые 30 секунд)
+        if not hasattr(self, '_last_protection_check'):
+            self._last_protection_check = 0
+        
+        import time
+        current_time = time.time()
+        if current_time - self._last_protection_check > 30:  # Каждые 30 секунд
+            self.verify_all_positions_have_sl_protection()
+            self._last_protection_check = current_time
             
         for symbol, pos in list(self.active_positions.items()):
             try:
@@ -1178,20 +1185,22 @@ class SignalWardenLive:
             
             # Проверяем безопасность нового SL уровня
             new_sl_price = pos['sl_current']
-            price_buffer = current_price * 0.001  # 0.1% буфер от текущей цены
+            price_buffer = current_price * 0.002  # Увеличили буфер до 0.2% для большей безопасности
             
+            is_sl_safe = True
             if pos['side'] == 'LONG':
                 # Для лонгов: SL должен быть ниже текущей цены с буфером
                 if new_sl_price >= (current_price - price_buffer):
-                    logger.warning(f"⚠️ {symbol}: NEW SL TOO CLOSE TO CURRENT PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f}, Buffer: {price_buffer:.6f}")
-                    logger.warning(f"⚠️ {symbol}: Skipping SL update to prevent immediate trigger")
-                    return
+                    is_sl_safe = False
             else:  # SHORT
                 # Для шортов: SL должен быть выше текущей цены с буфером
                 if new_sl_price <= (current_price + price_buffer):
-                    logger.warning(f"⚠️ {symbol}: NEW SL TOO CLOSE TO CURRENT PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f}, Buffer: {price_buffer:.6f}")
-                    logger.warning(f"⚠️ {symbol}: Skipping SL update to prevent immediate trigger")
-                    return
+                    is_sl_safe = False
+            
+            if not is_sl_safe:
+                logger.warning(f"⚠️ {symbol}: NEW SL TOO CLOSE TO CURRENT PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f}, Buffer: {price_buffer:.6f}")
+                logger.warning(f"⚠️ {symbol}: Skipping SL update to prevent immediate trigger")
+                return
             
             # STEP 2: Создаем НОВЫЙ SL ордер ПЕРВЫМ (позиция остается защищенной)
             sl_side = 'sell' if pos['side'] == 'LONG' else 'buy'
