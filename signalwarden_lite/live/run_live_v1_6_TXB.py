@@ -437,10 +437,24 @@ class SignalWardenLive:
                         continue
                 
                 # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Очищаем старые данные перед синхронизацией
+                # Но только если локальная и биржевая позиции не совпадают
                 if symbol in self.active_positions:
-                    logger.warning(f"🧹 {symbol}: Очищаем старые данные позиции перед синхронизацией")
-                    del self.active_positions[symbol]
-                    self.cleanup_position_state(symbol)
+                    local_pos = self.active_positions[symbol]
+                    # Проверяем совпадение с биржевой позицией
+                    local_side = local_pos.get('side', '')
+                    local_qty = abs(local_pos.get('qty', 0))
+                    exchange_side = 'LONG' if pos['side'] == 'long' else 'SHORT'
+                    exchange_qty = abs(float(pos['contracts']))
+                    
+                    # Если позиции кардинально различаются - очищаем
+                    if local_side != exchange_side or abs(local_qty - exchange_qty) > 0.1:
+                        logger.warning(f"🧹 {symbol}: Локальная и биржевая позиции не совпадают")
+                        logger.warning(f"🧹 {symbol}: Локальная: {local_side} {local_qty}, Биржа: {exchange_side} {exchange_qty}")
+                        del self.active_positions[symbol]
+                        self.cleanup_position_state(symbol)
+                    else:
+                        logger.info(f"✅ {symbol}: Локальная позиция совпадает с биржевой, пропускаем синхронизацию")
+                        continue  # Пропускаем синхронизацию для этой позиции
                 
                 # Create position info from exchange data (ЧИСТЫЕ данные!)
                 position_info = {
@@ -510,7 +524,7 @@ class SignalWardenLive:
         for symbol in positions_to_remove:
             if symbol in self.active_positions:
                 del self.active_positions[symbol]
-                self.save_position_state(symbol, None)  # Удаляем из хранилища
+                self.cleanup_position_state(symbol)  # ИСПРАВЛЕНО: используем правильную функцию
                 logger.info(f"🗑️ {symbol}: Позиция удалена из локального трекинга")
         
         if positions_to_remove:
@@ -539,7 +553,7 @@ class SignalWardenLive:
                 logger.warning(f"🧹 {symbol}: Позиция не существует на бирже, очищаем локально")
                 if symbol in self.active_positions:
                     del self.active_positions[symbol]
-                    self.save_position_state(symbol, None)  # Удаляем из хранилища
+                    self.cleanup_position_state(symbol)  # ИСПРАВЛЕНО: используем правильную функцию
                 return False
                 
             except Exception as e:
@@ -988,10 +1002,31 @@ class SignalWardenLive:
             else:
                 pnl_before_fees = (pos['entry'] - exit_price) * pos['qty']
             
-            # Calculate total commissions (entry + exit)
-            position_value = pos['entry'] * pos['qty']
-            taker_fee = 0.0005  # 0.05% taker fee
-            total_commission = position_value * taker_fee * 2  # entry + exit
+            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Улучшенный расчет комиссий
+            # Проверяем реальные комиссии с биржи если возможно
+            try:
+                # Получаем реальную информацию о комиссиях из ордера
+                actual_commission = 0.0
+                if 'fee' in close_order and close_order['fee']:
+                    actual_commission += float(close_order['fee']['cost'] or 0)
+                    logger.debug(f"💰 {symbol}: Реальная комиссия закрытия: {actual_commission:.6f} USDT")
+                
+                # Оценка комиссии входа (обычно maker с меньшей комиссией)
+                entry_value = pos['entry'] * pos['qty']
+                estimated_entry_fee = entry_value * 0.0002  # 0.02% maker fee (меньше чем taker)
+                
+                # Общая комиссия
+                total_commission = actual_commission + estimated_entry_fee
+                
+                logger.debug(f"💰 {symbol}: Оценка комиссии входа: {estimated_entry_fee:.6f} USDT")
+                
+            except Exception as fee_error:
+                logger.warning(f"⚠️ {symbol}: Не удалось получить реальные комиссии: {fee_error}")
+                # Fallback к старой логике с улучшенными коэффициентами
+                position_value = pos['entry'] * pos['qty']
+                # Используем смешанную комиссию: maker (0.02%) + taker (0.05%)
+                mixed_fee = (0.0002 + 0.0005) / 2  # Средняя между maker и taker
+                total_commission = position_value * mixed_fee * 2  # entry + exit
             
             # PnL after commissions
             pnl_usdt = pnl_before_fees - total_commission
@@ -1720,13 +1755,13 @@ class SignalWardenLive:
                 logger.warning(f"⚠️ {symbol}: {error_msg}")
                 return error_msg
             
-            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Принудительно очищаем старые данные трейлинга
-            # Новая позиция НЕ должна наследовать трейлинг от предыдущей!
+            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Очищаем старые данные ТОЛЬКО если позиция закрыта
+            # has_open_position уже очистил данные если позиция не существует на бирже
+            # Но на всякий случай проверяем локальные остатки
             if symbol in self.active_positions:
-                logger.error(f"❌ {symbol}: КРИТИЧНО - обнаружены старые данные позиции!")
+                logger.warning(f"🧹 {symbol}: Обнаружены локальные остатки данных, очищаем")
                 del self.active_positions[symbol]
                 self.cleanup_position_state(symbol)
-                logger.warning(f"🧹 {symbol}: Старые данные позиции очищены перед созданием новой")
             
             # Check if we have enough balance for new position (considering 5x leverage)
             if not self.can_open_new_position():

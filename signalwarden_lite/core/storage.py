@@ -35,7 +35,12 @@ class JSONStore:
             
             # Try to backup corrupted file
             if os.path.exists(self.path):
-                backup_path = f"{self.path}.corrupted.{int(datetime.utcnow().timestamp())}"
+                # Создаем папку для бэкапов
+                backup_dir = os.path.join(os.path.dirname(self.path), 'backups')
+                os.makedirs(backup_dir, exist_ok=True)
+                
+                filename = os.path.basename(self.path)
+                backup_path = os.path.join(backup_dir, f"{filename}.corrupted.{int(datetime.utcnow().timestamp())}")
                 try:
                     os.rename(self.path, backup_path)
                     print(f"💾 Corrupted file backed up as: {backup_path}")

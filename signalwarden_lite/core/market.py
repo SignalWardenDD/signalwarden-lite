@@ -45,7 +45,16 @@ def compute_market_bias(df_btc: pd.DataFrame, ema_fast: int = 50, ema_slow: int 
     out.loc[ema_cross_up, 'mkt_long_ok'] = True
     out.loc[ema_cross_up, 'mkt_short_ok'] = False
     
-    return out[['timestamp', 'mkt_long_ok', 'mkt_short_ok']]
+    # Return with timestamp as column if it exists, otherwise reset index to create timestamp column
+    if 'timestamp' in out.columns:
+        return out[['timestamp', 'mkt_long_ok', 'mkt_short_ok']]
+    else:
+        # Reset index to create timestamp column
+        out_reset = out.reset_index()
+        # Rename index column to timestamp if it's not named correctly
+        if out_reset.columns[0] != 'timestamp':
+            out_reset = out_reset.rename(columns={out_reset.columns[0]: 'timestamp'})
+        return out_reset[['timestamp', 'mkt_long_ok', 'mkt_short_ok']]
 
 def apply_market_filter(df: pd.DataFrame, market_gate: pd.DataFrame) -> pd.DataFrame:
     """

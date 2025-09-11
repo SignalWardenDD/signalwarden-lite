@@ -1,0 +1,30 @@
+{
+  "timestamp": "2025-09-10T06:56:34.291204",
+  "issues": [],
+  "warnings": [
+    {
+      "component": "CONFIG",
+      "warning": "Включен LIVE режим торговли!",
+      "timestamp": "2025-09-10T06:56:31.490189"
+    },
+    {
+      "component": "EXCHANGE",
+      "warning": "Низкий баланс USDT: 32.25952522",
+      "timestamp": "2025-09-10T06:56:33.131974"
+    }
+  ],
+  "recommendations": [
+    {
+      "component": "EXECUTION",
+      "recommendation": "Можно открыть до 7 позиций",
+      "timestamp": "2025-09-10T06:56:34.291161"
+    }
+  ],
+  "summary": {
+    "total_issues": 0,
+    "total_warnings": 2,
+    "total_recommendations": 1,
+    "critical_issues": 0,
+    "high_issues": 0
+  }
+}

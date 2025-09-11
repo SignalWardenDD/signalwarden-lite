@@ -14,37 +14,24 @@ timeframes:
 # Risk management - conservative for live trading
 risk:
   mode: fixed_margin
-  margin_usdt: 21        # $21 notional per trade (4.2 USDT actual margin with 5x leverage)
-  leverage: 5            # 5x leverage = $125 notional  
-  sl_atr_mult: 2.5       # Stop loss at 2.5x ATR (safer distance)
+  margin_usdt: 21        # $21 notional per trade (масштабировано с успешного $15)
+  leverage: 5            # 5x leverage = $105 notional  
+  sl_atr_mult: 2.5       # Stop loss at 2.5x ATR (ДАЛЬШЕ ОТ ВХОДА, больше места для роста)
   sl_order_type: stop_market    # 'stop_market' = маркет стоп-лосс (по умолчанию), 'stop' = лимитный стоп-лосс
   cutloss_early: 
     enabled: false       # Disabled for v1.6-TXB (trailing-only)
 
-# Profit-first trailing system
+# ЧИСТО PnL-BASED ТРЕЙЛИНГ ПО УРОВНЯМ - простая и понятная система
 trailing:
-  # Новая система трейлинга по PnL в USDT
-  activate_pnl_usdt: 0.10     # Активация трейлинга при 0.10 USDT PnL
-  
-  # Уровни сохранения прибыли
-  level_1_pnl: 0.10          # 0.10 USDT - сохранить 50%
-  level_1_keep_pct: 0.50     # 50%
-  
-  level_2_pnl: 0.20          # 0.20 USDT - сохранить 60%
-  level_2_keep_pct: 0.60     # 60%
-  
-  level_3_pnl: 0.30          # 0.30 USDT - сохранить 70%
-  level_3_keep_pct: 0.70     # 70%
-  
-  level_4_pnl: 0.40          # 0.40+ USDT - сохранить 80%
-  level_4_keep_pct: 0.80     # 80%
-  
-  # Старые параметры для обратной совместимости
-  move_to_be_at_R: 0.10      # Move to BE at 10% of R (~0.15 USDT)
-  be_offset_R: 0.05          # BE offset 5% of R (covers fees)
-  activate_R: 0.10           # Start trailing at 10% R (~0.15 USDT)
-  step_R: 0.15              # Trail step 15% of R (more responsive)
-  chandelier_k_atr: 2.0      # Chandelier 2.0x ATR (tighter trailing)
+  # Уровни трейлинга по прибыли в долларах (ЗАЩИТА ОТ НУЛЕВЫХ ЗАКРЫТИЙ)
+  level_1_pnl: 0.06           # При $0.06 прибыли → сохранить 50% = минимум $0.03
+  level_1_keep_pct: 0.50      # 50%
+  level_2_pnl: 0.15           # При $0.15 прибыли → сохранить 60% = минимум $0.09
+  level_2_keep_pct: 0.60      # 60%
+  level_3_pnl: 0.25           # При $0.25 прибыли → сохранить 70% = минимум $0.175
+  level_3_keep_pct: 0.70      # 70%
+  level_4_pnl: 0.35           # При $0.35+ прибыли → сохранить 80% = минимум $0.28
+  level_4_keep_pct: 0.80      # 80%
 
 # Market regime classification
 regime:

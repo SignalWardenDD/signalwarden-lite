@@ -1,0 +1,49 @@
+{
+  "timestamp": "2025-09-10T06:58:43.494963",
+  "total_tests": 8,
+  "passed_tests": 8,
+  "failed_tests": 0,
+  "success_rate": 100.0,
+  "test_results": {
+    "Configuration Loading": {
+      "passed": true,
+      "message": "Loaded 18 sections",
+      "timestamp": "2025-09-10T06:58:39.282346"
+    },
+    "Exchange Connection": {
+      "passed": true,
+      "message": "Balance: 32.26 USDT",
+      "timestamp": "2025-09-10T06:58:41.174143"
+    },
+    "State File Integrity": {
+      "passed": true,
+      "message": "Valid structure, 0 positions",
+      "timestamp": "2025-09-10T06:58:41.181098"
+    },
+    "State Validator": {
+      "passed": true,
+      "message": "State validation passed",
+      "timestamp": "2025-09-10T06:58:41.181748"
+    },
+    "Auto Fixer": {
+      "passed": true,
+      "message": "Backup creation and basic functionality OK",
+      "timestamp": "2025-09-10T06:58:41.182352"
+    },
+    "Signal Generation": {
+      "passed": true,
+      "message": "Generated 100 bars with signals",
+      "timestamp": "2025-09-10T06:58:41.231606"
+    },
+    "Market Filter": {
+      "passed": true,
+      "message": "Market bias: BEAR",
+      "timestamp": "2025-09-10T06:58:41.255810"
+    },
+    "Position Execution Conditions": {
+      "passed": true,
+      "message": "Can execute: True, Active positions: 0",
+      "timestamp": "2025-09-10T06:58:43.489096"
+    }
+  }
+}

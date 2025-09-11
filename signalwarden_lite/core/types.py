@@ -28,6 +28,7 @@ class Position:
     qty: float
     remaining_qty: float
     r_per_unit: float          # (entry - sl) для LONG; (sl - entry) для SHORT
+    atr: float = 0.0           # ATR для трейлинга
     is_open: bool = True
     peak_R: float = 0.0
     realized_pnl: float = 0.0

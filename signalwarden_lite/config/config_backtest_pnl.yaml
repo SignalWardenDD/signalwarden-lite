@@ -1,0 +1,48 @@
+# SignalWarden Lite v1.6-TXB - Backtest Configuration with PnL-based Trailing
+# ТОЧНО СООТВЕТСТВУЕТ PRODUCTION СИСТЕМЕ
+
+# Trading parameters
+trading:
+  notional_usdt: 21.0          # Position size (matching production)
+  sl_atr_mult: 2.5             # Stop loss multiplier (matching production)
+  leverage: 5                  # Leverage (matching production)
+  
+# PnL-based trailing system (EXACTLY matching production)
+trailing:
+  # Новая система трейлинга по PnL в USDT (как в production)
+  activate_pnl_usdt: 0.10     # Активация трейлинга при 0.10 USDT PnL
+  
+  # Уровни сохранения прибыли (как в production)
+  level_1_pnl: 0.10          # 0.10 USDT - сохранить 50% = минимум 0.05 USDT
+  level_1_keep_pct: 0.50     # 50%
+  
+  level_2_pnl: 0.20          # 0.20 USDT - сохранить 60%
+  level_2_keep_pct: 0.60     # 60%
+  
+  level_3_pnl: 0.30          # 0.30 USDT - сохранить 70%
+  level_3_keep_pct: 0.70     # 70%
+  
+  level_4_pnl: 0.40          # 0.40+ USDT - сохранить 80%
+  level_4_keep_pct: 0.80     # 80%
+
+# Fees (matching production)
+fees:
+  maker_bps: 2.0              # 0.02% maker fee
+  taker_bps: 5.0              # 0.05% taker fee
+  entry_liquidity: 'taker'    # Entry as taker (matching production)
+
+# Data parameters
+data:
+  start_date: '2022-01-01'
+  end_date: '2024-01-01'
+  timeframe: '1h'
+  
+# Symbols (matching production)
+symbols:
+  - 'BTC_USDT'
+  - 'ETH_USDT'
+  - 'ADA_USDT'
+  - 'DOGE_USDT'
+  - 'LTC_USDT'
+  - 'HBAR_USDT'
+  - 'PNUT_USDT'
