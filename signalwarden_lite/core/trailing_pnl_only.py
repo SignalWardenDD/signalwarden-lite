@@ -66,23 +66,16 @@ def update_trailing_pnl_only(pos: Position, hi: float, lo: float, atr: float, cf
             })
             
             if keep_pct > 0:
-                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Минимальная ЧИСТАЯ прибыль с учетом комиссий
-                min_profit_usdt = 0.03  # Минимальная ЧИСТАЯ прибыль $0.03
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Минимальная прибыль $0.03 (как в успешных бэктестах)
+                min_profit_usdt = 0.03  # Минимальная прибыль $0.03
                 
-                # Оценка комиссий для позиции
-                position_value = pos.entry * pos.qty
-                estimated_total_commission = position_value * 0.00035 * 2  # Средняя комиссия * 2 операции
-                
-                # КРИТИЧНО: Минимальная прибыль ДО комиссий = чистая + комиссии
-                min_profit_before_fees = min_profit_usdt + estimated_total_commission
-                
-                min_sl = pos.entry + (min_profit_before_fees / pos.qty)  # Минимальный SL (гарантируем $0.03 ЧИСТОЙ)
+                min_sl = pos.entry + (min_profit_usdt / pos.qty)  # Минимальный SL (гарантируем $0.03)
                 
                 # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ВСЕ уровни используют МАКСИМАЛЬНЫЙ PnL!
                 target_profit_raw = pos.peak_pnl_usdt * keep_pct
                 
-                # КРИТИЧЕСКАЯ ЗАЩИТА: Гарантируем минимальную ЧИСТУЮ прибыль
-                target_profit = max(target_profit_raw, min_profit_before_fees)
+                # КРИТИЧЕСКАЯ ЗАЩИТА: Гарантируем минимальную прибыль
+                target_profit = max(target_profit_raw, min_profit_usdt)
                 
                 # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: SL должен быть на уровне entry + сохраненная прибыль на единицу
                 # Для LONG: (SL - entry) * qty = target_profit, поэтому SL = entry + (target_profit / qty)
