@@ -1185,7 +1185,19 @@ class SignalWardenLive:
             
             # Проверяем безопасность нового SL уровня
             new_sl_price = pos['sl_current']
-            price_buffer = current_price * 0.002  # Увеличили буфер до 0.2% для большей безопасности
+            old_sl_price = pos.get('last_updated_sl', 0)
+            
+            # УМНАЯ ПРОВЕРКА: разные буферы для разных ситуаций
+            is_trailing_update = old_sl_price > 0 and abs(new_sl_price - old_sl_price) > 0.000001
+            
+            if is_trailing_update:
+                # Для трейлинга: маленький буфер 0.05% (чтобы не блокировать трейлинг)
+                price_buffer = current_price * 0.0005
+                buffer_name = "trailing"
+            else:
+                # Для первого SL и emergency: большой буфер 0.2%
+                price_buffer = current_price * 0.002
+                buffer_name = "initial/emergency"
             
             is_sl_safe = True
             if pos['side'] == 'LONG':
@@ -1198,7 +1210,7 @@ class SignalWardenLive:
                     is_sl_safe = False
             
             if not is_sl_safe:
-                logger.warning(f"⚠️ {symbol}: NEW SL TOO CLOSE TO CURRENT PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f}, Buffer: {price_buffer:.6f}")
+                logger.warning(f"⚠️ {symbol}: NEW SL TOO CLOSE TO CURRENT PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f}, Buffer: {price_buffer:.6f} ({buffer_name})")
                 logger.warning(f"⚠️ {symbol}: Skipping SL update to prevent immediate trigger")
                 return
             
