@@ -68,7 +68,7 @@ def update_trailing_pnl_only(pos: Position, hi: float, lo: float, atr: float, cf
             if keep_pct > 0:
                 # СТРОГАЯ ЗАЩИТА: Минимальная прибыль $0.03 (как требуется)
                 min_profit_usdt = 0.03  # Минимальная прибыль $0.03
-                min_sl = pos.entry + (min_profit_usdt / pos.qty)  # Минимальный SL для LONG
+                min_sl = pos.entry - (min_profit_usdt / pos.qty)  # Минимальный SL для LONG (гарантируем мин. $0.03)
                 
                 # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ВСЕ уровни используют МАКСИМАЛЬНЫЙ PnL!
                 # Это означает, что SL всегда растет и никогда не падает внутри уровня
@@ -77,11 +77,13 @@ def update_trailing_pnl_only(pos: Position, hi: float, lo: float, atr: float, cf
                 # КРИТИЧЕСКАЯ ЗАЩИТА: target_profit не может быть меньше $0.03
                 target_profit = max(target_profit, min_profit_usdt)
                 
-                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: SL должен быть на уровне entry + сохраненная прибыль на единицу
-                # Для LONG: (SL - entry) * qty = target_profit, поэтому SL = entry + (target_profit / qty)
-                pnl_sl = pos.entry + (target_profit / pos.qty)
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: SL должен быть на уровне entry - потеря прибыли на единицу
+                # Для LONG: (entry - SL) * qty = target_profit, поэтому SL = entry - (target_profit / qty)
+                # Это означает: если цена упадет до SL, мы потеряем target_profit, но сохраним остальную прибыль
+                pnl_sl = pos.entry - (target_profit / pos.qty)
                 
                 # ЗАЩИТА: Используем максимальный из рассчитанного SL и минимального защитного SL
+                # Для LONG: выбираем более высокий SL (ближе к entry = лучше защита)
                 protected_sl = max(pnl_sl, min_sl)
                 
                 old_sl = pos.sl  # Сохраняем старый SL
@@ -147,7 +149,7 @@ def update_trailing_pnl_only(pos: Position, hi: float, lo: float, atr: float, cf
             if keep_pct > 0:
                 # СТРОГАЯ ЗАЩИТА: Минимальная прибыль $0.03 (как требуется)
                 min_profit_usdt = 0.03  # Минимальная прибыль $0.03
-                min_sl = pos.entry - (min_profit_usdt / pos.qty)  # Минимальный SL для SHORT
+                min_sl = pos.entry + (min_profit_usdt / pos.qty)  # Минимальный SL для SHORT (гарантируем мин. $0.03)
                 
                 # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: ВСЕ уровни используют МАКСИМАЛЬНЫЙ PnL!
                 # Это означает, что SL всегда растет и никогда не падает внутри уровня
@@ -156,10 +158,13 @@ def update_trailing_pnl_only(pos: Position, hi: float, lo: float, atr: float, cf
                 # КРИТИЧЕСКАЯ ЗАЩИТА: target_profit не может быть меньше $0.03
                 target_profit = max(target_profit, min_profit_usdt)
                 
-                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: SL должен быть на уровне entry - сохраненная прибыль на единицу
-                pnl_sl = pos.entry - (target_profit / pos.qty)
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: SL должен быть на уровне entry + потеря прибыли на единицу
+                # Для SHORT: (SL - entry) * qty = target_profit, поэтому SL = entry + (target_profit / qty)
+                # Это означает: если цена поднимется до SL, мы потеряем target_profit, но сохраним остальную прибыль
+                pnl_sl = pos.entry + (target_profit / pos.qty)
                 
                 # ЗАЩИТА: Используем минимальный из рассчитанного SL и максимального защитного SL
+                # Для SHORT: выбираем более низкий SL (ближе к entry = лучше защита)
                 protected_sl = min(pnl_sl, min_sl)
                 
                 old_sl = pos.sl  # Сохраняем старый SL

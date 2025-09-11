@@ -2,11 +2,11 @@
   "metadata": {
     "version": "v1.6-TXB",
     "created": "2025-09-11T17:05:47.512686",
-    "last_updated": "2025-09-11T23:07:39.533184",
+    "last_updated": "2025-09-11T23:05:35.502356",
     "recovery_mode": true,
     "original_error": "[Errno 2] No such file or directory: 'trading_state_v1_6_TXB.json.tmp'",
     "missing_positions_fixed": true,
-    "fix_timestamp": 1757631987.3000991,
+    "fix_timestamp": 1757631487.680755,
     "ghost_positions_fixed": true
   },
   "symbols": {
@@ -32,19 +32,19 @@
       "active_position": {
         "symbol": "DOGE_USDT",
         "side": "LONG",
-        "entry": 0.2571182857142857,
-        "qty": 81.67447111612888,
-        "sl_initial": 0.24825935714285713,
-        "sl_current": 0.24825935714285713,
-        "atr": 0.003543571428571426,
-        "timestamp": 1757632012.537343,
-        "order_id": "81494443976",
-        "sl_order_id": "81494444499",
+        "entry": 0.25514514285714285,
+        "qty": 82.3060935624317,
+        "sl_initial": 0.246288,
+        "sl_current": 0.246288,
+        "atr": 0.003542857142857137,
+        "timestamp": 1757630173.888275,
+        "order_id": "81492706891",
+        "sl_order_id": "81492707841",
         "trailing_active": false,
         "peak_pnl_usdt": 0.0,
-        "last_updated_sl": 0.24825935714285713
+        "last_updated_sl": 0.246288
       },
-      "last_signal_time": 1757632012.537598
+      "last_signal_time": 1757630173.8886452
     },
     "LTC_USDT": {
       "active_position": {
@@ -141,17 +141,6 @@
       "peak_pnl_usdt": 0.04640000000000004,
       "trailing_active": false,
       "timestamp": 1757630849.676524
-    },
-    "ADA_USDT_position": {
-      "symbol": "ADA_USDT",
-      "side": "LONG",
-      "entry": 0.892,
-      "qty": 23.0,
-      "sl_current": 0.8716071428571428,
-      "sl_initial": 0.8716071428571428,
-      "peak_pnl_usdt": 0.02300000000000002,
-      "trailing_active": false,
-      "timestamp": 1757632059.5074492
     }
   },
   "signals_history": [
@@ -12360,115 +12349,29 @@
       },
       "result": "\u274c Position already open for PNUT_USDT - skipping",
       "datetime": "2025-09-12T02:05:35"
-    },
-    {
-      "symbol": "ADA_USDT",
-      "timestamp": 1757632004,
-      "signal": {
-        "timeframe": "15m",
-        "side": "LONG",
-        "setup": "inside",
-        "entry": 0.8935442857142858,
-        "reason": "inside",
-        "atr": 0.0028142857142857214,
-        "regime": "ultra_calm",
-        "confidence": "MEDIUM",
-        "symbol": "ADA_USDT"
-      },
-      "result": "\u274c Position already open for ADA_USDT - skipping",
-      "datetime": "2025-09-12T02:06:44"
-    },
-    {
-      "symbol": "LTC_USDT",
-      "timestamp": 1757632005,
-      "signal": {
-        "timeframe": "15m",
-        "side": "LONG",
-        "setup": "sq",
-        "entry": 116.15785714285714,
-        "reason": "squeeze",
-        "atr": 0.29285714285714143,
-        "regime": "ultra_calm",
-        "confidence": "MEDIUM",
-        "symbol": "LTC_USDT"
-      },
-      "result": "\u274c Position already open for LTC_USDT - skipping",
-      "datetime": "2025-09-12T02:06:45"
-    },
-    {
-      "symbol": "DOGE_USDT",
-      "timestamp": 1757632012,
-      "signal": {
-        "timeframe": "15m",
-        "side": "LONG",
-        "setup": "sq",
-        "entry": 0.2571182857142857,
-        "reason": "squeeze",
-        "atr": 0.001394285714285713,
-        "regime": "ultra_calm",
-        "confidence": "MEDIUM",
-        "symbol": "DOGE_USDT"
-      },
-      "result": "\u2705 LONG sq @ 0.257118, SL @ 0.248259, Qty: 81.674471",
-      "datetime": "2025-09-12T02:06:52"
-    },
-    {
-      "symbol": "HBAR_USDT",
-      "timestamp": 1757632017,
-      "signal": {
-        "timeframe": "15m",
-        "side": "LONG",
-        "setup": "inside",
-        "entry": 0.24012521428571426,
-        "reason": "inside",
-        "atr": 0.0013507142857142826,
-        "regime": "ultra_calm",
-        "confidence": "MEDIUM",
-        "symbol": "HBAR_USDT"
-      },
-      "result": "\u274c Position already open for HBAR_USDT - skipping",
-      "datetime": "2025-09-12T02:06:57"
-    },
-    {
-      "symbol": "WIF_USDT",
-      "timestamp": 1757632019,
-      "signal": {
-        "timeframe": "15m",
-        "side": "LONG",
-        "setup": "sq",
-        "entry": 0.9075585714285714,
-        "reason": "squeeze",
-        "atr": 0.0035285714285714126,
-        "regime": "ultra_calm",
-        "confidence": "MEDIUM",
-        "symbol": "WIF_USDT"
-      },
-      "result": "\u274c Position already open for WIF_USDT - skipping",
-      "datetime": "2025-09-12T02:06:59"
-    },
-    {
-      "symbol": "PNUT_USDT",
-      "timestamp": 1757632021,
-      "signal": {
-        "timeframe": "15m",
-        "side": "LONG",
-        "setup": "sq",
-        "entry": 0.2394052142857143,
-        "reason": "squeeze",
-        "atr": 0.0012507142857142836,
-        "regime": "ultra_calm",
-        "confidence": "MEDIUM",
-        "symbol": "PNUT_USDT"
-      },
-      "result": "\u274c Position already open for PNUT_USDT - skipping",
-      "datetime": "2025-09-12T02:07:01"
     }
   ],
   "performance": {
-    "total_signals": 724,
-    "total_trades": 110
+    "total_signals": 718,
+    "total_trades": 109
   },
   "active_positions": {
+    "DOGE_USDT": {
+      "symbol": "DOGE_USDT",
+      "side": "LONG",
+      "entry": 0.25081,
+      "qty": 82.0,
+      "sl_initial": 0.24579379999999998,
+      "sl_current": 0.24579379999999998,
+      "atr": 0.005016199999999999,
+      "timestamp": 1757622590.605514,
+      "order_id": null,
+      "trailing_active": false,
+      "unrealized_pnl": 0.02296,
+      "peak_pnl_usdt": 0.0,
+      "synced_from_exchange": true,
+      "auto_fixed": true
+    },
     "LTC_USDT": {
       "symbol": "LTC_USDT",
       "side": "LONG",
