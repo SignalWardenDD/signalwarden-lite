@@ -141,7 +141,7 @@ class CCXTBinanceUSDMExecutor:
             return {"status": "error", "error": str(e), "symbol": symbol}
 
     def ensure_stop(self, symbol: str, side: str, stop_price: float, qty: float):
-        """Create or update stop-market order"""
+        """Create or update stop-market order with distance validation"""
         if not self.cfg.manage_stop:
             return
         
@@ -149,6 +149,29 @@ class CCXTBinanceUSDMExecutor:
         key = (symbol, side)
         
         try:
+            # Get current price for validation
+            ticker = self.exchange.fetch_ticker(ccxt_symbol)
+            current_price = ticker['last']
+            
+            # Calculate distance from current price
+            if side == 'LONG':
+                distance_pct = abs(current_price - stop_price) / current_price * 100
+                min_distance_pct = 0.5  # Minimum 0.5% distance for LONG
+            else:
+                distance_pct = abs(stop_price - current_price) / current_price * 100
+                min_distance_pct = 0.5  # Minimum 0.5% distance for SHORT
+            
+            # Validate minimum distance
+            if distance_pct < min_distance_pct:
+                if side == 'LONG':
+                    adjusted_stop = current_price * (1 - min_distance_pct / 100)
+                else:
+                    adjusted_stop = current_price * (1 + min_distance_pct / 100)
+                
+                logger.warning(f"⚠️ {symbol}: SL слишком близко к цене! Дистанция: {distance_pct:.2f}% < {min_distance_pct}%")
+                logger.warning(f"   Корректировка SL: {stop_price:.6f} → {adjusted_stop:.6f}")
+                stop_price = adjusted_stop
+            
             # Cancel existing stop if it exists
             existing_order_id = self.open_stops.get(key)
             if existing_order_id:
@@ -181,10 +204,29 @@ class CCXTBinanceUSDMExecutor:
             )
             
             self.open_stops[key] = stop_order['id']
-            logger.info(f"Created stop order: {symbol} {side} @ {stop_price:.6f}, order_id={stop_order['id']}")
+            logger.info(f"✅ Created stop order: {symbol} {side} @ {stop_price:.6f}, order_id={stop_order['id']}")
             
         except Exception as e:
-            logger.error(f"Failed to manage stop order for {symbol} {side}: {e}")
+            if "Order would immediately trigger" in str(e) or "-2021" in str(e):
+                logger.error(f"❌ {symbol}: SL слишком близко к цене! Ошибка: {e}")
+                logger.error(f"❌ {symbol}: КРИТИЧНО - НЕ УДАЛОСЬ СОЗДАТЬ SL ОРДЕР!")
+                logger.error(f"❌ {symbol}: ПОЗИЦИЯ НЕ БУДЕТ ДОБАВЛЕНА В ТРЕЙЛИНГ!")
+                
+                # Попробуем закрыть позицию для безопасности
+                try:
+                    close_order = self.exchange.create_order(
+                        ccxt_symbol,
+                        'market',
+                        'sell' if side == 'LONG' else 'buy',
+                        qty,
+                        None,
+                        {'positionSide': 'LONG' if side == 'LONG' else 'SHORT', 'reduceOnly': True}
+                    )
+                    logger.warning(f"🛡️ {symbol}: Позиция закрыта для безопасности (ID: {close_order['id']})")
+                except Exception as close_e:
+                    logger.error(f"❌ {symbol}: Не удалось закрыть небезопасную позицию: {close_e}")
+            else:
+                logger.error(f"Failed to manage stop order for {symbol} {side}: {e}")
             # Don't raise - continue trading, just log the error
 
     def place(self, symbol: str, plan: OrderPlan, qty: float) -> Dict[str, Any]:

@@ -49,7 +49,7 @@ class SignalWardenLive:
         self.last_1h_fetch = {}  # symbol -> timestamp
         self.last_15m_fetch = {}  # symbol -> timestamp  
         self.btc_gate_cache = None
-        self.btc_gate_timestamp = 0
+        self.btc_gate_timestamp = int(time.time())  # ИСПРАВЛЕНО: Правильная инициализация времени
         self.data_cache = {}  # symbol_timeframe -> (data, timestamp)
         self.cache_ttl = 60  # Cache TTL: 60 seconds
         
@@ -213,7 +213,7 @@ class SignalWardenLive:
     def load_positions_from_state(self):
         """КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Загрузить активные позиции из торгового состояния"""
         try:
-            state_data = self.storage.load_state()
+            state_data = self.storage.read()
             symbols_data = state_data.get('symbols', {})
             
             loaded_count = 0
@@ -740,9 +740,10 @@ class SignalWardenLive:
         if not hasattr(self, '_last_protection_check'):
             self._last_protection_check = 0
         
-        import time
         current_time = time.time()
         if current_time - self._last_protection_check > 30:  # Каждые 30 секунд
+            # СНАЧАЛА очищаем orphaned ордера, ПОТОМ проверяем защиту
+            self.cleanup_orphaned_orders()
             self.verify_all_positions_have_sl_protection()
             self._last_protection_check = current_time
             
@@ -759,6 +760,30 @@ class SignalWardenLive:
                 # ПРОВЕРКА СИНХРОНИЗАЦИИ: сравниваем расчетный PnL с биржевым
                 calculated_pnl = (current_price - pos['entry']) * pos['qty'] if pos['side'] == 'LONG' else (pos['entry'] - current_price) * pos['qty']
                 pnl_diff = abs(real_pnl - calculated_pnl)
+                
+                # УЛУЧШЕННАЯ ПРОВЕРКА: Проверяем реальное наличие позиции на бирже
+                # Получаем актуальные позиции с биржи
+                try:
+                    ccxt_sym = self.ccxt_symbol(symbol)
+                    exchange_positions = self.exchange.fetch_positions([ccxt_sym])
+                    position_exists = False
+                    
+                    for ex_pos in exchange_positions:
+                        if float(ex_pos['contracts']) != 0:
+                            position_exists = True
+                            break
+                    
+                    # Если позиции нет на бирже, но есть локально - удаляем
+                    if not position_exists:
+                        logger.warning(f"🚨 {symbol}: Позиция НЕ СУЩЕСТВУЕТ на бирже! Удаляем из локального трекинга")
+                        logger.info(f"🗑️ {symbol}: Удаляем закрытую позицию из локального трекинга")
+                        # Помечаем позицию для удаления
+                        pos['_to_remove'] = True
+                        continue
+                        
+                except Exception as pos_check_error:
+                    logger.warning(f"⚠️ {symbol}: Ошибка проверки существования позиции: {pos_check_error}")
+                    # Если не можем проверить - продолжаем обычную логику
                 
                 if pnl_diff > 0.50:  # Разница больше 0.50 USDT
                     logger.warning(f"⚠️ {symbol}: PnL рассинхронизация! Биржа: {real_pnl:.4f}, Расчет: {calculated_pnl:.4f}, Разница: {pnl_diff:.4f}")
@@ -952,6 +977,16 @@ class SignalWardenLive:
                     self.close_position(symbol, current_price, "Trailing SL Hit")
             except Exception as e:
                 logger.error(f"❌ Trailing update failed for {symbol}: {e}")
+        
+        # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Удаляем позиции помеченные как закрытые на бирже
+        positions_to_remove = []
+        for symbol, pos in self.active_positions.items():
+            if pos.get('_to_remove', False):
+                positions_to_remove.append(symbol)
+        
+        for symbol in positions_to_remove:
+            logger.info(f"🗑️ {symbol}: Удаляем закрытую позицию из трекинга")
+            self.close_position(symbol, 0.0, "Position closed on exchange")
                 
     def close_position(self, symbol: str, exit_price: float, reason: str):
         """Close position and clean up"""
@@ -1342,6 +1377,105 @@ class SignalWardenLive:
         except Exception as e:
             logger.error(f"❌ Failed to update sliding SL for {symbol}: {e}")
     
+    def cleanup_orphaned_orders(self):
+        """Очистка orphaned (лишних) stop-loss ордеров на бирже"""
+        if self.paper_mode:
+            return
+            
+        try:
+            # Получаем все позиции с биржи
+            exchange_positions = self.exchange.fetch_positions()
+            active_symbols = set(self.active_positions.keys())
+            
+            # Проверяем каждый символ из наших активных позиций
+            for symbol in active_symbols:
+                try:
+                    ccxt_sym = self.ccxt_symbol(symbol)
+                    open_orders = self.exchange.fetch_open_orders(ccxt_sym)
+                    
+                    # Найти все SL ордера для этого символа
+                    sl_orders = []
+                    for order in open_orders:
+                        if (order['type'] in ['stop_market', 'stop'] and 
+                            order['info'].get('reduceOnly') and
+                            order['status'] == 'open'):
+                            sl_orders.append(order)
+                    
+                    # КРИТИЧЕСКАЯ ПРОВЕРКА: должен быть только ОДИН SL ордер на позицию
+                    if len(sl_orders) > 1:
+                        logger.warning(f"🧹 {symbol}: Найдено {len(sl_orders)} SL ордеров, должен быть только 1!")
+                        
+                        # Сортируем по времени создания (новейший первый)
+                        sl_orders.sort(key=lambda x: x['timestamp'], reverse=True)
+                        
+                        # Оставляем только новейший ордер
+                        newest_order = sl_orders[0]
+                        orders_to_cancel = sl_orders[1:]
+                        
+                        logger.info(f"🧹 {symbol}: Оставляем новейший SL ордер ID: {newest_order['id']} @ {newest_order['stopPrice']}")
+                        
+                        # Отменяем старые ордера
+                        for old_order in orders_to_cancel:
+                            try:
+                                self.exchange.cancel_order(old_order['id'], ccxt_sym)
+                                logger.info(f"🧹 {symbol}: Отменен старый SL ордер ID: {old_order['id']}")
+                                time.sleep(0.1)  # Небольшая задержка между отменами
+                            except Exception as cancel_error:
+                                logger.warning(f"⚠️ {symbol}: Не удалось отменить старый SL {old_order['id']}: {cancel_error}")
+                        
+                        # Обновляем локальную информацию о SL ордере
+                        if symbol in self.active_positions:
+                            self.active_positions[symbol]['sl_order_id'] = newest_order['id']
+                            self.active_positions[symbol]['last_updated_sl'] = float(newest_order['stopPrice'])
+                    
+                    elif len(sl_orders) == 1:
+                        # Все в порядке - один SL ордер
+                        sl_order = sl_orders[0]
+                        logger.debug(f"✅ {symbol}: Корректный SL ордер ID: {sl_order['id']} @ {sl_order['stopPrice']}")
+                        
+                        # Убеждаемся что локальная информация актуальна
+                        if symbol in self.active_positions:
+                            self.active_positions[symbol]['sl_order_id'] = sl_order['id']
+                            if 'last_updated_sl' not in self.active_positions[symbol]:
+                                self.active_positions[symbol]['last_updated_sl'] = float(sl_order['stopPrice'])
+                    
+                    elif len(sl_orders) == 0:
+                        # Нет SL ордеров - это проблема, но она решается в verify_all_positions_have_sl_protection
+                        logger.debug(f"⚠️ {symbol}: Нет SL ордеров (будет создан в verify_all_positions_have_sl_protection)")
+                        
+                except Exception as symbol_error:
+                    logger.warning(f"⚠️ Ошибка очистки ордеров для {symbol}: {symbol_error}")
+            
+            # ДОПОЛНИТЕЛЬНАЯ ОЧИСТКА: Ищем orphaned ордера для символов, которых нет в наших активных позициях
+            # ИСПРАВЛЕНО: Получаем ВСЕ открытые ордера, а не только для активных символов
+            try:
+                # Получаем все открытые ордера без фильтрации по символам
+                all_open_orders = self.exchange.fetch_open_orders()
+                
+                # Ищем SL ордера для символов, которых нет в active_positions
+                for order in all_open_orders:
+                    if (order['type'] in ['stop_market', 'stop'] and 
+                        order['info'].get('reduceOnly') and
+                        order['status'] == 'open'):
+                        
+                        # Конвертируем символ обратно к нашему формату
+                        ccxt_symbol = order['symbol']
+                        our_symbol = ccxt_symbol.replace('/', '_').replace(':USDT', '')
+                        
+                        if our_symbol not in active_symbols:
+                            logger.warning(f"🧹 Найден orphaned SL ордер для {our_symbol} (ID: {order['id']}) - позиции нет в active_positions")
+                            try:
+                                self.exchange.cancel_order(order['id'], ccxt_symbol)
+                                logger.info(f"🧹 Отменен orphaned SL ордер {our_symbol} ID: {order['id']}")
+                            except Exception as cancel_error:
+                                logger.warning(f"⚠️ Не удалось отменить orphaned ордер {order['id']}: {cancel_error}")
+                
+            except Exception as global_cleanup_error:
+                logger.warning(f"⚠️ Ошибка глобальной очистки ордеров: {global_cleanup_error}")
+                
+        except Exception as e:
+            logger.error(f"❌ Критическая ошибка очистки orphaned ордеров: {e}")
+
     def verify_all_positions_have_sl_protection(self):
         """Критическая проверка: все позиции должны иметь активные SL ордера"""
         if self.paper_mode:
@@ -1355,27 +1489,39 @@ class SignalWardenLive:
                 
                 # Проверяем наличие SL ордеров на бирже
                 open_orders = self.exchange.fetch_open_orders(ccxt_sym)
-                has_sl_order = False
+                sl_orders = []
                 
                 for order in open_orders:
-                    if order['type'] in ['stop_market', 'stop'] and order['info'].get('reduceOnly'):
-                        has_sl_order = True
-                        break
+                    if (order['type'] in ['stop_market', 'stop'] and 
+                        order['info'].get('reduceOnly') and
+                        order['status'] == 'open'):
+                        sl_orders.append(order)
                 
-                if not has_sl_order:
+                if len(sl_orders) == 0:
                     unprotected_positions.append(symbol)
-                    logger.error(f"❌ {symbol}: CRITICAL - ПОЗИЦИЯ БЕЗ SL ОРДЕРА! Entry: {pos['entry']:.6f}, Current SL: {pos.get('sl_current', 'N/A')}")
+                    entry_price = pos.get('entry_price', pos.get('entry', 0))
+                    current_sl = pos.get('last_updated_sl', pos.get('sl_current', 'N/A'))
+                    logger.error(f"❌ {symbol}: CRITICAL - ПОЗИЦИЯ БЕЗ SL ОРДЕРА! Entry: {entry_price:.6f}, Current SL: {current_sl}")
                     
                     # Пытаемся создать экстренный SL
                     try:
-                        sl_side = 'sell' if pos['side'] == 'LONG' else 'buy'
-                        emergency_sl = pos.get('sl_current', pos.get('sl_initial', pos['entry'] * (0.97 if pos['side'] == 'LONG' else 1.03)))
+                        side = pos.get('side', 'long').lower()
+                        sl_side = 'sell' if side == 'long' else 'buy'
+                        quantity = pos.get('quantity', pos.get('qty', 0))
+                        
+                        # Рассчитываем emergency SL цену
+                        emergency_sl = pos.get('last_updated_sl')
+                        if not emergency_sl:
+                            emergency_sl = pos.get('sl_current', pos.get('sl_initial'))
+                        if not emergency_sl:
+                            # Используем 3% от входной цены как emergency SL
+                            emergency_sl = entry_price * (0.97 if side == 'long' else 1.03)
                         
                         emergency_order = self.exchange.create_order(
                             ccxt_sym,
                             'stop_market',
                             sl_side,
-                            pos['qty'],
+                            quantity,
                             None,
                             params={
                                 'stopPrice': emergency_sl,
@@ -1384,13 +1530,16 @@ class SignalWardenLive:
                             }
                         )
                         
-                        pos['sl_order_id'] = emergency_order['id']
+                        pos['sl_order_id'] = str(emergency_order['id'])
                         pos['last_updated_sl'] = emergency_sl
                         logger.warning(f"🛡️ {symbol}: EMERGENCY SL создан @ {emergency_sl:.6f} (ID: {emergency_order['id']})")
                         
                     except Exception as emergency_error:
                         logger.error(f"❌ {symbol}: НЕ УДАЛОСЬ СОЗДАТЬ EMERGENCY SL: {emergency_error}")
                         logger.error(f"❌ {symbol}: ПОЗИЦИЯ ОСТАЕТСЯ ПОЛНОСТЬЮ НЕЗАЩИЩЕННОЙ!")
+                
+                elif len(sl_orders) > 1:
+                    logger.warning(f"⚠️ {symbol}: Найдено {len(sl_orders)} SL ордеров, должен быть только 1! (Будет исправлено в cleanup_orphaned_orders)")
                         
             except Exception as check_error:
                 logger.warning(f"⚠️ Ошибка проверки SL для {symbol}: {check_error}")
@@ -1444,18 +1593,15 @@ class SignalWardenLive:
         return self.fetch_ohlcv(symbol, timeframe, limit)
             
     def get_btc_market_bias(self, force_refresh: bool = False) -> Optional[pd.DataFrame]:
-        """Get BTC market filter with caching and auto-refresh"""
+        """Get BTC market filter - ВСЕГДА получает свежие данные с Binance"""
         current_time = int(time.time())
         
-        # Cache for 1 minute (reduced from 2) + force refresh option
-        # Более частое обновление для быстрого реагирования на смену тренда
-        cache_valid = (self.btc_gate_cache is not None and 
-                      current_time - self.btc_gate_timestamp < 60)
-        
-        if cache_valid and not force_refresh:
-            return self.btc_gate_cache
+        # ИСПРАВЛЕНО: Убираем кеширование для BTC данных - всегда получаем свежие данные
+        # Актуальность BTC тренда критически важна для правильной торговли
+        logger.debug("📊 Получение актуальных BTC данных с Binance...")
             
         try:
+            # Всегда получаем свежие данные BTC с биржи
             btc_1h = self.fetch_ohlcv('BTC/USDT:USDT', '1h', 200)
             if btc_1h.empty:
                 logger.warning("⚠️ No BTC data - market filter disabled")
@@ -1472,7 +1618,7 @@ class SignalWardenLive:
             long_ok = latest['mkt_long_ok']
             short_ok = latest['mkt_short_ok']
             
-            # Detect trend changes (before updating cache)
+            # Detect trend changes (только если есть старый кеш)
             old_cache = self.btc_gate_cache
             trend_changed = False
             if old_cache is not None and not old_cache.empty:
@@ -1485,11 +1631,6 @@ class SignalWardenLive:
                     logger.warning(f"🔄 BTC TREND CHANGE DETECTED! "
                                  f"Long: {old_long_ok}→{long_ok}, "
                                  f"Short: {old_short_ok}→{short_ok}")
-                    
-                    # КРИТИЧЕСКОЕ: При смене тренда принудительно обновляем кеш чаще
-                    logger.warning("🚨 CRITICAL: Market trend changed! Forcing more frequent cache updates...")
-                    # Устанавливаем более короткий TTL для кеша при смене тренда
-                    self.btc_gate_timestamp = current_time - 30  # Принудительно обновим через 30 секунд
             
             if long_ok and short_ok:
                 market_state = "🟡 NEUTRAL"
@@ -1503,7 +1644,7 @@ class SignalWardenLive:
             logger.info(f"📊 BTC Market Filter: {market_state}"
                        f" {'🔄 CHANGED!' if trend_changed else ''}")
             
-            # Update cache after trend detection
+            # Сохраняем для сравнения (но не используем для кеширования)
             self.btc_gate_cache = btc_bias
             self.btc_gate_timestamp = current_time
             
@@ -1601,16 +1742,9 @@ class SignalWardenLive:
         }
         
         try:
-            # Get BTC market filter with automatic refresh check
-            current_time = int(time.time())
-            cache_age = current_time - self.btc_gate_timestamp
-            
-            # Auto-refresh if cache is old (5+ minutes) - более частое обновление
-            force_refresh = cache_age > 300
-            if force_refresh:
-                logger.warning(f"⚠️ BTC кеш слишком старый ({cache_age//60}мин), принудительное обновление...")
-            
-            btc_gate = self.get_btc_market_bias(force_refresh=force_refresh)
+            # ИСПРАВЛЕНО: Всегда получаем актуальные BTC данные без проверки возраста кеша
+            # Актуальность BTC тренда критически важна для правильной торговли
+            btc_gate = self.get_btc_market_bias()
             
             # Fetch 1h data for breakout signals
             df_1h = self.fetch_ohlcv(symbol, '1h', 200)

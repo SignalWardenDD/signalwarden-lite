@@ -1,0 +1,87 @@
+{
+  "active_positions": {
+    "PNUT_USDT": {
+      "symbol": "PNUT_USDT",
+      "side": "long",
+      "quantity": 87.0,
+      "entry_price": 0.238631954023,
+      "sl_order_id": "8968727598",
+      "last_updated_sl": 0.23299,
+      "unrealized_pnl": -0.13082625,
+      "peak_pnl": 0.0,
+      "trailing_active": false,
+      "created_at": "2025-09-12T17:41:31.260365",
+      "last_sync": "2025-09-12T17:41:31.260368"
+    },
+    "DOGE_USDT": {
+      "symbol": "DOGE_USDT",
+      "side": "long",
+      "quantity": 79.0,
+      "entry_price": 0.26458,
+      "sl_order_id": "81545542599",
+      "last_updated_sl": 0.2582,
+      "unrealized_pnl": -0.10366143,
+      "peak_pnl": 0.0,
+      "trailing_active": false,
+      "created_at": "2025-09-12T17:41:31.260385",
+      "last_sync": "2025-09-12T17:41:31.260387"
+    },
+    "LTC_USDT": {
+      "symbol": "LTC_USDT",
+      "side": "long",
+      "quantity": 0.179,
+      "entry_price": 116.57,
+      "sl_order_id": "38530377113",
+      "last_updated_sl": 114.53,
+      "unrealized_pnl": -0.06623,
+      "peak_pnl": 0.0,
+      "trailing_active": false,
+      "created_at": "2025-09-12T17:41:31.260401",
+      "last_sync": "2025-09-12T17:41:31.260403"
+    },
+    "HBAR_USDT": {
+      "symbol": "HBAR_USDT",
+      "side": "long",
+      "quantity": 86.0,
+      "entry_price": 0.24157,
+      "sl_order_id": "13149669783",
+      "last_updated_sl": 0.23756,
+      "unrealized_pnl": -0.05934,
+      "peak_pnl": 0.0,
+      "trailing_active": false,
+      "created_at": "2025-09-12T17:41:31.260416",
+      "last_sync": "2025-09-12T17:41:31.260419"
+    },
+    "ADA_USDT": {
+      "symbol": "ADA_USDT",
+      "side": "long",
+      "quantity": 23.0,
+      "entry_price": 0.8934,
+      "sl_order_id": "58081844408",
+      "last_updated_sl": 0.879,
+      "unrealized_pnl": -0.11390083,
+      "peak_pnl": 0.0,
+      "trailing_active": false,
+      "created_at": "2025-09-12T17:41:31.260432",
+      "last_sync": "2025-09-12T17:41:31.260434"
+    },
+    "WIF_USDT": {
+      "symbol": "WIF_USDT",
+      "side": "long",
+      "quantity": 23.0,
+      "entry_price": 0.9079,
+      "sl_order_id": "20493844649",
+      "last_updated_sl": 0.8866,
+      "unrealized_pnl": -0.1656,
+      "peak_pnl": 0.0,
+      "trailing_active": false,
+      "created_at": "2025-09-12T17:41:31.260446",
+      "last_sync": "2025-09-12T17:41:31.260448"
+    }
+  },
+  "metadata": {
+    "last_updated": "2025-09-12T17:41:31.260314",
+    "emergency_fix": true,
+    "version": "v1_6_TXB"
+  }
+}
