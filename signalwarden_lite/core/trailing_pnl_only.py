@@ -89,13 +89,28 @@ def update_trailing_pnl_only(pos: Position, hi: float, lo: float, atr: float, cf
             protection_applied = protected_sl > new_sl
             
             # КРИТИЧЕСКОЕ ПРАВИЛО: SL может ТОЛЬКО УЛУЧШАТЬСЯ (для лонгов - расти)
-            if protected_sl > pos.sl:
+            # ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: SL не должен быть выше текущей цены (hi)
+            if protected_sl > pos.sl and protected_sl < hi:
                 pos.sl = protected_sl
                 pos.trailing_debug['sl_updated'] = True
                 pos.trailing_debug['protection_applied'] = protection_applied
                 pos.trailing_debug['protected_sl'] = protected_sl
                 pos.trailing_debug['pnl_sl'] = new_sl
                 logger.debug(f"📊 PnL-трейлинг: SL обновлен до ${protected_sl:.6f} (уровень {level_name}, цель: ${target_profit:.4f})")
+            elif protected_sl >= hi:
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: SL выше текущей цены - используем цену с буфером
+                safe_sl = hi * 0.999  # 0.1% буфер ниже текущей цены
+                if safe_sl > pos.sl:
+                    pos.sl = safe_sl
+                    pos.trailing_debug['sl_updated'] = True
+                    pos.trailing_debug['protection_applied'] = True
+                    pos.trailing_debug['protected_sl'] = safe_sl
+                    pos.trailing_debug['pnl_sl'] = new_sl
+                    pos.trailing_debug['price_protection'] = True
+                    logger.warning(f"🚨 PnL-трейлинг: SL ${protected_sl:.6f} выше цены ${hi:.6f}! Используем безопасный SL ${safe_sl:.6f}")
+                else:
+                    pos.trailing_debug['sl_updated'] = False
+                    logger.warning(f"🚨 PnL-трейлинг: Безопасный SL ${safe_sl:.6f} не лучше текущего ${pos.sl:.6f}")
             else:
                 pos.trailing_debug['sl_updated'] = False
                 logger.debug(f"📊 PnL-трейлинг: SL ${protected_sl:.6f} не лучше текущего ${pos.sl:.6f} (уровень {level_name})")
@@ -166,13 +181,28 @@ def update_trailing_pnl_only(pos: Position, hi: float, lo: float, atr: float, cf
             protection_applied = protected_sl < new_sl
             
             # КРИТИЧЕСКОЕ ПРАВИЛО: SL может ТОЛЬКО УЛУЧШАТЬСЯ (для шортов - падать)
-            if protected_sl < pos.sl:
+            # ДОПОЛНИТЕЛЬНАЯ ЗАЩИТА: SL не должен быть ниже текущей цены (lo)
+            if protected_sl < pos.sl and protected_sl > lo:
                 pos.sl = protected_sl
                 pos.trailing_debug['sl_updated'] = True
                 pos.trailing_debug['protection_applied'] = protection_applied
                 pos.trailing_debug['protected_sl'] = protected_sl
                 pos.trailing_debug['pnl_sl'] = new_sl
                 logger.debug(f"📊 PnL-трейлинг SHORT: SL обновлен до ${protected_sl:.6f} (уровень {level_name}, цель: ${target_profit:.4f})")
+            elif protected_sl <= lo:
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: SL ниже текущей цены - используем цену с буфером
+                safe_sl = lo * 1.001  # 0.1% буфер выше текущей цены
+                if safe_sl < pos.sl:
+                    pos.sl = safe_sl
+                    pos.trailing_debug['sl_updated'] = True
+                    pos.trailing_debug['protection_applied'] = True
+                    pos.trailing_debug['protected_sl'] = safe_sl
+                    pos.trailing_debug['pnl_sl'] = new_sl
+                    pos.trailing_debug['price_protection'] = True
+                    logger.warning(f"🚨 PnL-трейлинг SHORT: SL ${protected_sl:.6f} ниже цены ${lo:.6f}! Используем безопасный SL ${safe_sl:.6f}")
+                else:
+                    pos.trailing_debug['sl_updated'] = False
+                    logger.warning(f"🚨 PnL-трейлинг SHORT: Безопасный SL ${safe_sl:.6f} не лучше текущего ${pos.sl:.6f}")
             else:
                 pos.trailing_debug['sl_updated'] = False
                 logger.debug(f"📊 PnL-трейлинг SHORT: SL ${protected_sl:.6f} не лучше текущего ${pos.sl:.6f} (уровень {level_name})")
