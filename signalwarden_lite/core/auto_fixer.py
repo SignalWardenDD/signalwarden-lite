@@ -86,13 +86,31 @@ class AutoFixer:
                 if symbol not in exchange_symbols:
                     ghost_positions.append(symbol)
                     
-            if ghost_positions:
-                logger.warning(f"🗑️ Найдены призрачные позиции: {ghost_positions}")
+            # Также проверяем позиции в секции symbols
+            ghost_in_symbols = []
+            for symbol, symbol_data in symbols_data.items():
+                if symbol_data.get('active_position') is not None:
+                    if symbol not in exchange_symbols:
+                        ghost_in_symbols.append(symbol)
+                        
+            # Объединяем списки призрачных позиций
+            all_ghost_positions = list(set(ghost_positions + ghost_in_symbols))
+                    
+            if all_ghost_positions:
+                logger.warning(f"🗑️ Найдены призрачные позиции: {all_ghost_positions}")
+                logger.info(f"   - В active_positions: {ghost_positions}")
+                logger.info(f"   - В symbols: {ghost_in_symbols}")
                 
-                for symbol in ghost_positions:
-                    del active_positions[symbol]
-                    if symbol in symbols_data:
+                for symbol in all_ghost_positions:
+                    # Удаляем из active_positions
+                    if symbol in active_positions:
+                        del active_positions[symbol]
+                        logger.info(f"🗑️ Удалена позиция из active_positions: {symbol}")
+                    
+                    # Очищаем в symbols
+                    if symbol in symbols_data and symbols_data[symbol].get('active_position') is not None:
                         symbols_data[symbol]['active_position'] = None
+                        logger.info(f"🗑️ Очищена позиция в symbols: {symbol}")
                         
                 # Сохранить исправленное состояние
                 state['active_positions'] = active_positions
@@ -106,11 +124,11 @@ class AutoFixer:
                     
                 self.fixes_applied.append({
                     'type': 'ghost_positions',
-                    'symbols': ghost_positions,
+                    'symbols': all_ghost_positions,
                     'timestamp': datetime.utcnow().isoformat()
                 })
                 
-                logger.info(f"✅ Удалены призрачные позиции: {ghost_positions}")
+                logger.info(f"✅ Удалены призрачные позиции: {all_ghost_positions}")
                 return True
             else:
                 logger.info("✅ Призрачные позиции не найдены")
@@ -152,7 +170,12 @@ class AutoFixer:
                 base_quote = symbol_ccxt.split(':')[0]
                 symbol = base_quote.replace('/', '_')
                 
-                if symbol in configured_symbols and symbol not in active_positions:
+                # Проверяем что позиции действительно нет В ОБЕИХ секциях
+                has_active_pos = symbol in active_positions
+                has_symbols_pos = (symbol in symbols_data and 
+                                 symbols_data[symbol].get('active_position') is not None)
+                
+                if symbol in configured_symbols and not has_active_pos and not has_symbols_pos:
                     missing_positions.append({
                         'symbol': symbol,
                         'side': 'LONG' if pos['side'] == 'long' else 'SHORT',

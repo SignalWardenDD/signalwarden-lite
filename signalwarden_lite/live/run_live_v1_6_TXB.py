@@ -368,14 +368,8 @@ class SignalWardenLive:
                             entry_price = float(pos['entryPrice'])
                             side = 'LONG' if pos['side'] == 'long' else 'SHORT'
                             
-                            # ИСПРАВЛЕНО: Используем чистый ATR (как в успешном бэктесте!)
-                            # НО с минимальной защитой от микроубытков в ultra_calm режиме
-                            min_atr = entry_price * 0.008  # Минимум 0.8% от цены для защиты от микроубытков
-                            effective_atr = max(atr, min_atr)
-                            
-                            # Логирование защиты от микроубытков
-                            if effective_atr > atr:
-                                logger.warning(f"🛡️ {symbol}: ATR защита активна при синхронизации! Оригинальный ATR {atr:.6f} → Эффективный ATR {effective_atr:.6f}")
+                            # Используем чистый ATR (как в стратегии)
+                            effective_atr = atr
                             
                             if side == 'LONG':
                                 sl_price = entry_price - (self.sl_atr_mult * effective_atr)
@@ -670,11 +664,9 @@ class SignalWardenLive:
                             if not df.empty:
                                 df = add_indicators(df, atr_p=14)
                                 atr = float(df.iloc[-1]['atr'])
-                                # Защита от микроубытков: минимальный ATR
-                                min_atr = entry_price * 0.008  # 0.8% от цены
-                                effective_atr = max(atr, min_atr)
+                                # Используем чистый ATR (как в стратегии)
+                                effective_atr = atr
                                 sl_price = entry_price - (self.sl_atr_mult * effective_atr) if side == 'LONG' else entry_price + (self.sl_atr_mult * effective_atr)
-                                atr = effective_atr  # Обновляем для логирования
                             else:
                                 raise Exception("Empty dataframe")
                         except Exception as e:
@@ -849,15 +841,22 @@ class SignalWardenLive:
                 # Add peak_pnl_usdt tracking to Position object
                 position.peak_pnl_usdt = pos.get('peak_pnl_usdt', 0.0)
                 
-                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Используем расчетный PnL если биржевый недоступен
-                # Не блокируем трейлинг при PnL <= 0, используем расчетный PnL как fallback
-                effective_pnl = real_pnl if real_pnl != 0 else calculated_pnl
+                # Используем только реальный PnL с биржи (надежно)
+                effective_pnl = real_pnl
                 
-                # Обновляем peak_pnl_usdt если текущий PnL больше
-                if effective_pnl > position.peak_pnl_usdt:
-                    position.peak_pnl_usdt = effective_pnl
-                    pos['peak_pnl_usdt'] = effective_pnl
-                    logger.debug(f"📈 {symbol}: Новый пик PnL: ${effective_pnl:.4f}")
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Обновляем peak_pnl_usdt при ЛЮБОМ положительном PnL
+                # Если peak_pnl_usdt был сброшен в 0, а текущий PnL > 0.06 - трейлинг должен активироваться!
+                if effective_pnl > 0:
+                    if position.peak_pnl_usdt == 0.0 and effective_pnl >= self.trailing.level_1_pnl:
+                        # Экстренная активация трейлинга для позиций выше порога
+                        position.peak_pnl_usdt = effective_pnl
+                        pos['peak_pnl_usdt'] = effective_pnl
+                        logger.warning(f"🚨 {symbol}: ЭКСТРЕННАЯ АКТИВАЦИЯ трейлинга! PnL ${effective_pnl:.4f} >= ${self.trailing.level_1_pnl} (peak был 0)")
+                    elif effective_pnl > position.peak_pnl_usdt:
+                        # Обычное обновление пика
+                        position.peak_pnl_usdt = effective_pnl
+                        pos['peak_pnl_usdt'] = effective_pnl
+                        logger.debug(f"📈 {symbol}: Новый пик PnL: ${effective_pnl:.4f}")
                 
                 # Трейлинг работает даже при небольшом убытке для защиты минимальной прибыли
                 logger.debug(f"📊 {symbol}: Трейлинг PnL check - Real: {real_pnl:.4f}, Calculated: {calculated_pnl:.4f}, Effective: {effective_pnl:.4f}")
@@ -932,7 +931,24 @@ class SignalWardenLive:
                     
                 if should_update:
                     old_sl = pos['sl_current']
-                    pos['sl_current'] = updated_pos.sl
+                    
+                    # КРИТИЧЕСКАЯ ЗАЩИТА: SL может ТОЛЬКО УЛУЧШАТЬСЯ!
+                    new_sl = updated_pos.sl
+                    if pos['side'] == 'LONG':
+                        # Для лонгов: новый SL должен быть ВЫШЕ (лучше)
+                        if new_sl > old_sl:
+                            pos['sl_current'] = new_sl
+                        else:
+                            logger.warning(f"⚠️ {symbol}: Попытка ухудшить LONG SL! {old_sl:.6f} → {new_sl:.6f}, блокируем!")
+                            continue  # Не обновляем SL
+                    else:  # SHORT
+                        # Для шортов: новый SL должен быть НИЖЕ (лучше)
+                        if new_sl < old_sl:
+                            pos['sl_current'] = new_sl
+                        else:
+                            logger.warning(f"⚠️ {symbol}: Попытка ухудшить SHORT SL! {old_sl:.6f} → {new_sl:.6f}, блокируем!")
+                            continue  # Не обновляем SL
+                    
                     pos['trailing_active'] = True
                     
                     # Save updated peak PnL
@@ -1293,9 +1309,10 @@ class SignalWardenLive:
                 logger.warning(f"⚠️ {symbol}: Skipping INITIAL SL update to prevent immediate trigger")
                 return
             elif not is_sl_safe and is_trailing_update:
-                # Для трейлинга: предупреждаем но НЕ блокируем (защита прибыли важнее)
+                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Для трейлинга НИКОГДА НЕ БЛОКИРУЕМ!
+                # Защита минимальной прибыли важнее риска немедленного срабатывания!
                 logger.warning(f"🚨 {symbol}: TRAILING SL CLOSE TO PRICE! SL: {new_sl_price:.6f}, Price: {current_price:.6f} - PROCEEDING (profit protection priority)")
-                logger.warning(f"🚨 {symbol}: Это может быть защита минимальной прибыли при движении против нас")
+                logger.warning(f"🚨 {symbol}: Это защита минимальной прибыли $0.03 - КРИТИЧЕСКИ ВАЖНО!")
             
             # STEP 2: Создаем НОВЫЙ SL ордер ПЕРВЫМ (позиция остается защищенной)
             sl_side = 'sell' if pos['side'] == 'LONG' else 'buy'
@@ -1340,9 +1357,22 @@ class SignalWardenLive:
                 except Exception as e:
                     error_msg = str(e).lower()
                     if "order would immediately trigger" in error_msg or "-2021" in str(e):
-                        logger.error(f"❌ {symbol}: NEW SL WOULD TRIGGER IMMEDIATELY! Current: {current_price:.6f}, New SL: {new_sl_price:.6f}")
-                        logger.error(f"❌ {symbol}: This should not happen after our price checks! Aborting SL update.")
-                        return  # Прерываем обновление SL
+                        if is_trailing_update:
+                            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Для трейлинга НЕ прерываем!
+                            # Это может быть защита минимальной прибыли - попробуем еще раз!
+                            logger.warning(f"🚨 {symbol}: TRAILING SL WOULD TRIGGER IMMEDIATELY! Current: {current_price:.6f}, New SL: {new_sl_price:.6f}")
+                            logger.warning(f"🚨 {symbol}: Это может быть защита минимальной прибыли - продолжаем попытки!")
+                            if attempt < max_retries - 1:
+                                time.sleep(0.5)  # Пауза перед повтором
+                                continue
+                            else:
+                                logger.error(f"❌ {symbol}: КРИТИЧНО - не удалось создать TRAILING SL после всех попыток!")
+                                logger.error(f"❌ {symbol}: Позиция может остаться без защиты минимальной прибыли!")
+                                break
+                        else:
+                            logger.error(f"❌ {symbol}: NEW INITIAL SL WOULD TRIGGER IMMEDIATELY! Current: {current_price:.6f}, New SL: {new_sl_price:.6f}")
+                            logger.error(f"❌ {symbol}: This should not happen after our price checks! Aborting SL update.")
+                            return  # Прерываем обновление только для начальных SL
                     else:
                         logger.warning(f"⚠️ {symbol}: SL creation attempt {attempt+1}/{max_retries} failed: {e}")
                         if attempt < max_retries - 1:
@@ -1914,10 +1944,8 @@ class SignalWardenLive:
             position_value_usdt = self.margin_usdt  # 21 USDT notional exactly
             qty = position_value_usdt / entry
             
-            # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Усиленная защита от микроубытков
-            # Увеличиваем минимальный ATR для гарантированной защиты
-            min_atr = entry * 0.008  # Минимум 0.8% от цены для защиты от микроубытков
-            effective_atr = max(atr, min_atr)
+            # Используем чистый ATR (как в стратегии)
+            effective_atr = atr
             
             if side == 'LONG':
                 sl_price = entry - (self.sl_atr_mult * effective_atr)
@@ -1929,10 +1957,8 @@ class SignalWardenLive:
             sl_distance_usdt = abs(sl_price - entry) * qty
             sl_distance_pct = (abs(sl_price - entry) / entry) * 100
             
-            # Логирование защиты от микроубытков
-            if effective_atr > original_atr:
-                logger.warning(f"🛡️ {symbol}: ATR защита активна! Оригинальный ATR {original_atr:.6f} → Эффективный ATR {effective_atr:.6f}")
-                logger.warning(f"🛡️ {symbol}: SL distance увеличена с {(original_atr*self.sl_atr_mult/entry)*100:.2f}% до {sl_distance_pct:.2f}%")
+            # Логирование SL расстояния
+            logger.info(f"🔍 {symbol}: ATR {effective_atr:.6f}, SL distance {sl_distance_pct:.2f}%")
             
             logger.info(f"🎯 {symbol} {side} ENTRY ANALYSIS:")
             logger.info(f"   📊 Entry: {entry:.6f}, Qty: {qty:.4f} ({position_value_usdt} USDT)")
