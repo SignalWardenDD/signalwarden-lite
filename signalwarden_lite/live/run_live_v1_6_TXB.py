@@ -749,20 +749,21 @@ class SignalWardenLive:
                 current_price = float(df.iloc[-1]['close'])
                 real_pnl = self.get_position_pnl_from_exchange(symbol)
                 
-                # ПРОВЕРКА СИНХРОНИЗАЦИИ: сравниваем расчетный PnL с биржевым
-                calculated_pnl = (current_price - pos['entry']) * pos['qty'] if pos['side'] == 'LONG' else (pos['entry'] - current_price) * pos['qty']
-                pnl_diff = abs(real_pnl - calculated_pnl)
-                
                 # УЛУЧШЕННАЯ ПРОВЕРКА: Проверяем реальное наличие позиции на бирже
                 # Получаем актуальные позиции с биржи
                 try:
                     ccxt_sym = self.ccxt_symbol(symbol)
                     exchange_positions = self.exchange.fetch_positions([ccxt_sym])
                     position_exists = False
+                    actual_qty = 0.0
+                    actual_entry = 0.0
                     
                     for ex_pos in exchange_positions:
-                        if float(ex_pos['contracts']) != 0:
+                        contracts = float(ex_pos['contracts'])
+                        if contracts != 0:
                             position_exists = True
+                            actual_qty = abs(contracts)
+                            actual_entry = float(ex_pos['entryPrice'])
                             break
                     
                     # Если позиции нет на бирже, но есть локально - удаляем
@@ -772,16 +773,27 @@ class SignalWardenLive:
                         # Помечаем позицию для удаления
                         pos['_to_remove'] = True
                         continue
+                    
+                    # ИСПРАВЛЕНИЕ РАССИНХРОНИЗАЦИИ: Используем РЕАЛЬНЫЕ данные с биржи для расчетов
+                    # Если есть значительная разница в количестве или цене входа - обновляем
+                    qty_diff = abs(actual_qty - pos['qty'])
+                    entry_diff = abs(actual_entry - pos['entry'])
+                    
+                    if qty_diff > 0.001:  # Разница в количестве
+                        logger.info(f"🔄 {symbol}: Синхронизация количества: {pos['qty']:.4f} → {actual_qty:.4f}")
+                        pos['qty'] = actual_qty
+                        
+                    if entry_diff > 0.000001:  # Разница в цене входа
+                        logger.info(f"🔄 {symbol}: Синхронизация цены входа: {pos['entry']:.6f} → {actual_entry:.6f}")
+                        pos['entry'] = actual_entry
                         
                 except Exception as pos_check_error:
                     logger.warning(f"⚠️ {symbol}: Ошибка проверки существования позиции: {pos_check_error}")
                     # Если не можем проверить - продолжаем обычную логику
                 
-                if pnl_diff > 0.50:  # Разница больше 0.50 USDT
-                    logger.warning(f"⚠️ {symbol}: PnL рассинхронизация! Биржа: {real_pnl:.4f}, Расчет: {calculated_pnl:.4f}, Разница: {pnl_diff:.4f}")
-                    # Используем биржевый PnL как более точный
-                elif pnl_diff > 0.10:  # Небольшая разница
-                    logger.debug(f"📊 {symbol}: Небольшая PnL разница: {pnl_diff:.4f} USDT")
+                # ИСПРАВЛЕНО: Убираем расчетный PnL - используем только биржевый
+                # Расчетный PnL не учитывает комиссии, проскальзывание и частичные исполнения
+                logger.debug(f"📊 {symbol}: Используем биржевый PnL: {real_pnl:.4f} USDT")
                 
                 # Update position with real PnL
                 pos['unrealized_pnl'] = real_pnl
@@ -859,7 +871,7 @@ class SignalWardenLive:
                         logger.debug(f"📈 {symbol}: Новый пик PnL: ${effective_pnl:.4f}")
                 
                 # Трейлинг работает даже при небольшом убытке для защиты минимальной прибыли
-                logger.debug(f"📊 {symbol}: Трейлинг PnL check - Real: {real_pnl:.4f}, Calculated: {calculated_pnl:.4f}, Effective: {effective_pnl:.4f}")
+                logger.debug(f"📊 {symbol}: Трейлинг PnL check - Real: {real_pnl:.4f}, Effective: {effective_pnl:.4f}")
                 
                 # R-based трейлинг имеет свою логику активации внутри функции
                 
